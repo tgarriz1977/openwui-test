@@ -13,6 +13,7 @@ resources:
   - 05-hpa.yaml
   - 06-pipeline.yaml
   - 07-docling-gpu.yaml
+  - 08-redis.yaml
 
 # Configuración común para todos los recursos
 commonLabels:
