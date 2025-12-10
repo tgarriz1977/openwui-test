@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docling
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docling
+  template:
+    metadata:
+      labels:
+        app: docling
+    spec:
+      imagePullSecrets:
+      - name: harbor-secret
+      containers:
+      - name: docling
+        image: quay.io/docling-project/docling-serve
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5001
+          name: http
+        env:
+        - name: DOCLING_OCR_ENGINE
+          value: tesseract
+        - name: DOCLING_OCR_LANG
+          value: spa,eng
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 250m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 3Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docling
+spec:
+  selector:
+    app: docling
+  ports:
+  - port: 5001
+    targetPort: http
+

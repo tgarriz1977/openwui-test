@@ -1,0 +1,53 @@
+# Dockerfile para LlamaIndex RAG API con Reranking
+# Versión simplificada y robusta
+
+FROM python:3.11-slim
+
+# Metadata
+LABEL maintainer="ARBA DevOps Team"
+LABEL description="LlamaIndex RAG API with BAAI Reranker integration"
+LABEL version="1.0.0"
+
+# Variables de entorno para Python
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/home/appuser/.local/bin:$PATH"
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Crear usuario no-root
+RUN useradd -m -u 1000 -s /bin/bash appuser && \
+    mkdir -p /app/data /app/logs && \
+    chown -R appuser:appuser /app
+
+# Cambiar a usuario no-root
+USER appuser
+WORKDIR /app
+
+# Actualizar pip
+RUN pip install --user --no-cache-dir --upgrade pip setuptools wheel
+
+# Copiar requirements
+COPY --chown=appuser:appuser requirements.txt .
+
+# Instalar dependencias Python
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Copiar código de la aplicación
+COPY --chown=appuser:appuser llamaindex_service.py .
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Exponer puerto
+EXPOSE 8000
+
+# Comando de inicio
+CMD ["python", "-u", "llamaindex_service.py"]

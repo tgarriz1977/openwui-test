@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pipelines
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: rag-system
+  name: pipelines
+  namespace: rag-system
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: pipelines
+      app.kubernetes.io/managed-by: kustomize
+      app.kubernetes.io/part-of: rag-system
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: pipelines
+        app.kubernetes.io/managed-by: kustomize
+        app.kubernetes.io/part-of: rag-system
+    spec:
+      containers:
+      - env:
+        - name: PIPELINES_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: api-key
+              name: pipelines-secret
+        - name: PIPELINES_URLS
+        - name: LOG_LEVEL
+          value: INFO
+        image: ghcr.io/open-webui/pipelines:main
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: pipelines
+        ports:
+        - containerPort: 9099
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+        volumeMounts:
+        - mountPath: /app/pipelines
+          name: pipelines-data
+      imagePullSecrets:
+      - name: harbor-secret
+      restartPolicy: Always
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsUser: 1000
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: pipelines-data
+        persistentVolumeClaim:
+          claimName: pipelines-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: rag-system
+  name: pipelines-storage
+  namespace: rag-system
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: longhorn
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pipelines
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: rag-system
+  name: pipelines-service
+  namespace: rag-system
+spec:
+  ports:
+  - name: http
+    port: 9099
+    protocol: TCP
+    targetPort: 9099
+  selector:
+    app: pipelines
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: rag-system
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+data:
+  api-key: MHAzbi13M2J1IQ==
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: rag-system
+  name: pipelines-secret
+  namespace: rag-system
+type: Opaque

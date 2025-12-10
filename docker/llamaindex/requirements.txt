@@ -1,0 +1,36 @@
+# LlamaIndex RAG API - Python Dependencies
+# Versiones compatibles verificadas
+
+# FastAPI y servidor
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic>=2.11.5,<3.0
+pydantic-settings>=2.5.2
+
+# LlamaIndex core y componentes
+llama-index-core>=0.14.3,<0.15
+llama-index-llms-openai-like==0.5.3
+llama-index-embeddings-openai>=0.3.0
+llama-index-vector-stores-qdrant>=0.4.0
+
+# Vector DB client
+qdrant-client==1.11.3
+
+# HTTP client
+httpx==0.27.2
+
+# Utilidades
+python-multipart==0.0.9
+python-dotenv==1.0.1
+
+# Logging
+structlog==24.4.0
+
+# Para procesamiento de documentos (opcional)
+pypdf==5.0.1
+python-docx==1.1.2
+openpyxl==3.1.5
+
+# Typing extensions (requerido por pydantic)
+typing-extensions>=4.12.0
+

@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rag-system
+
+resources:
+  - 00-configmap.yaml
+  - 01-storage.yaml
+  - 02-qdrant.yaml
+  #- 03-llamaindex-api.yaml
+  - 03-secrets.yaml
+  - 04-openwebui.yaml
+  - 05-hpa.yaml
+  - 06-pipeline.yaml
+  - 07-docling-gpu.yaml
+
+# Configuración común para todos los recursos
+commonLabels:
+  app.kubernetes.io/part-of: rag-system
+  app.kubernetes.io/managed-by: kustomize
+
+# Prefijo para todos los recursos (opcional)
+# namePrefix: prod-
+
+# Sufijo para todos los recursos (opcional)
+# nameSuffix: -v1
+
+# Imágenes - útil para cambiar versiones sin editar YAMLs
+images:
+  - name: ghcr.io/open-webui/open-webui
+    newTag: main
+  - name: qdrant/qdrant
+    newTag: v1.16
+
+# ConfigMap generator (alternativa a archivos estáticos)
+# configMapGenerator:
+#   - name: rag-config
+#     literals:
+#       - CHUNK_SIZE=1000
+#       - CHUNK_OVERLAP=200
+#       - RAG_TOP_K=20
+#       - RERANK_TOP_N=5
+
+# Patches estratégicos para diferentes entornos
+# patchesStrategicMerge:
+#   - overlays/production/resources.yaml
+#   - overlays/production/replicas.yaml

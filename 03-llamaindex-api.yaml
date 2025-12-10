@@ -1,0 +1,180 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llamaindex-api
+  namespace: rag-system
+  labels:
+    app: llamaindex-api
+    version: v1
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: llamaindex-api
+  template:
+    metadata:
+      labels:
+        app: llamaindex-api
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      # Pull secret para Harbor
+      imagePullSecrets:
+      - name: harbor-secret
+      
+      containers:
+      - name: llamaindex-api
+        image: registry.arba.gov.ar/infraestructura/llamaindex-rag-api:1.0.0
+        imagePullPolicy: Always
+        
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        
+        # Variables de entorno desde ConfigMap
+        envFrom:
+        - configMapRef:
+            name: rag-config
+        
+        # Variables adicionales
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: WORKERS
+          value: "1"
+        
+        # Resources optimizados
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        
+        # Probes mejoradas
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Startup probe para primera inicialización
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+        
+        # Security context del contenedor
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volúmenes para logs y datos temporales
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: app-data
+          mountPath: /app/data
+      
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: llamaindex-storage
+      
+      # Afinidad para distribuir pods
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - llamaindex-api
+              topologyKey: kubernetes.io/hostname
+      
+      # Tolerations (opcional, ajustar según tu cluster)
+      # tolerations:
+      # - key: "workload"
+      #   operator: "Equal"
+      #   value: "api"
+      #   effect: "NoSchedule"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llamaindex-api-service
+  namespace: rag-system
+  labels:
+    app: llamaindex-api
+spec:
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: llamaindex-api
+
+---
+# Service Monitor para Prometheus (opcional)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: llamaindex-api
+  namespace: rag-system
+  labels:
+    app: llamaindex-api
+spec:
+  selector:
+    matchLabels:
+      app: llamaindex-api
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
