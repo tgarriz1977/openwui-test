@@ -56,7 +56,7 @@ args:
   - Cache de queries
   - Estado temporal de la aplicación
 
-- **La data persistente está en PostgreSQL** (configurado en línea 89 de 04-openwebui.yaml)
+- **La data persistente está en PostgreSQL** (desplegado internamente en 09-postgresql.yaml)
 
 - Si Redis se reinicia:
   - Los usuarios deben refrescar la página
@@ -104,7 +104,7 @@ limits:
      ▼                       ▼
 ┌──────────┐          ┌──────────┐
 │ Redis    │          │PostgreSQL│
-│ Stateless│          │ (Externo)│
+│ Stateless│          │ (Interno)│
 │ (Sesiones│          │ (Data)   │
 │  Cache)  │          │          │
 └──────────┘          └──────────┘
@@ -115,9 +115,12 @@ limits:
 En [04-openwebui.yaml](04-openwebui.yaml):
 
 ```yaml
-# PostgreSQL - Data persistente
+# PostgreSQL - Data persistente (interno)
 - name: DATABASE_URL
-  value: "postgresql://..."
+  valueFrom:
+    secretKeyRef:
+      name: postgresql-secret
+      key: database-url  # postgresql://ragsystemuser:rag322wq@postgres:5432/ragsystemdb
 
 # Redis - Sesiones y WebSockets (stateless)
 - name: WEBSOCKET_MANAGER
@@ -126,12 +129,12 @@ En [04-openwebui.yaml](04-openwebui.yaml):
   valueFrom:
     secretKeyRef:
       name: redis-config
-      key: websocket-url  # DB 1
+      key: websocket-url  # redis://redis-service:6379/1
 - name: REDIS_URL
   valueFrom:
     secretKeyRef:
       name: redis-config
-      key: cache-url      # DB 0
+      key: cache-url      # redis://redis-service:6379/0
 
 # Secret compartida entre pods
 - name: WEBUI_SECRET_KEY

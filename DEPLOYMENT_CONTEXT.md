@@ -6,7 +6,7 @@
 Sistema RAG (Retrieval-Augmented Generation) desplegado en Kubernetes que proporciona un chatbot inteligente con capacidades de búsqueda semántica sobre documentos. Utiliza Open WebUI como interfaz, Qdrant como base de datos vectorial, y modelos LLM de Qwen para generación de respuestas y embeddings.
 
 ### URL de Acceso
-- **Producción**: https://asistente.test.arba.gov.ar
+- **Producción**: https://asistente.colegio-tecnicos.edu.ar (configurar según dominio)
 - **Namespace**: `rag-system`
 
 ---
@@ -53,32 +53,48 @@ Sistema RAG (Retrieval-Augmented Generation) desplegado en Kubernetes que propor
 
 ---
 
-## Servicios Externos Integrados
+## Servicios Internos del Sistema
 
 ### 1. PostgreSQL (Base de Datos Relacional)
-**Host**: `10.16.25.12:5432`
+**Deployment**: `postgresql` (StatefulSet)
+- **Imagen**: `postgres:16-alpine`
+- **Service**: `postgres:5432` / `postgresql-service:5432`
 - **Database**: `ragsystemdb`
 - **User**: `ragsystemuser`
 - **Uso**: Almacenamiento de usuarios, conversaciones, configuraciones, metadatos
 
 **Función Crítica**: Permite escrituras concurrentes de múltiples réplicas de Open WebUI. Reemplaza SQLite que no soporta multi-escritura.
 
-### 2. Redis Sentinel Cluster
-**Namespace**: `redis-sentinel`
-- **Service**: `redis-sentinel.redis-sentinel.svc.cluster.local:6379`
-- **Configuración**: 3 nodos con replicación automática y failover
-- **Contraseña**: Almacenada en secret `redis-sentinel/redis-password`
+**Almacenamiento**:
+- **PVC**: `postgresql-storage` (10Gi, ReadWriteOnce, Longhorn)
+- **Extensiones**: uuid-ossp, pg_trgm para búsqueda full-text
+- **Timezone**: America/Argentina/Buenos_Aires
+
+**Credenciales** (en secret `postgresql-secret`):
+- Usuario aplicación: `ragsystemuser`
+- Password: `rag322wq`
+- Superusuario postgres: `admin123`
+
+## Servicios Externos Integrados
+
+### 2. Redis (Cache y WebSocket)
+**Deployment**: `redis` (StatefulSet)
+- **Imagen**: `redis:7-alpine`
+- **Service**: `redis-service:6379`
+- **Configuración**: Modo standalone, stateless (sin persistencia)
 
 **Bases de datos asignadas**:
-- **DB 0**: Drupal cache (45,994 keys) - OCUPADA
-- **DB 1**: Tomcat sessions (793 keys) - OCUPADA
-- **DB 2**: Open WebUI WebSocket sessions - ASIGNADA
-- **DB 3**: Open WebUI configuration cache - ASIGNADA
+- **DB 0**: Cache general de aplicación, sesiones
+- **DB 1**: Coordinación de WebSockets entre pods
 
 **Función Crítica**:
 - Sincronización de sesiones WebSocket entre réplicas
 - Cache compartido de configuraciones
 - Notificaciones pub/sub entre pods
+
+**Almacenamiento**:
+- Sin PVC (stateless) - La data importante está en PostgreSQL
+- Configuración de persistencia deshabilitada para mejor performance
 
 ### 3. SimpleVLLM (LLM Principal)
 **Namespace**: `simplevllm`
@@ -107,8 +123,8 @@ Open WebUI está configurado para escalar automáticamente:
 
 ### Requisitos para Escalado
 1. ✅ **PVC ReadWriteMany**: Permite múltiples pods montar el mismo volumen
-2. ✅ **PostgreSQL externo**: Base de datos compartida entre réplicas
-3. ✅ **Redis para WebSocket**: Sincronización de sesiones entre pods
+2. ✅ **PostgreSQL interno**: Base de datos compartida entre réplicas (StatefulSet)
+3. ✅ **Redis interno para WebSocket**: Sincronización de sesiones entre pods
 4. ✅ **Secret Key compartida**: Autenticación consistente entre réplicas
 5. ✅ **Sticky Sessions**: Afinidad de cookie en Ingress NGINX
 
@@ -116,20 +132,27 @@ Open WebUI está configurado para escalar automáticamente:
 
 ## Secrets de Kubernetes
 
-### 1. `redis-config` (namespace: rag-system)
+### 1. `postgresql-secret` (namespace: rag-system)
 ```yaml
-websocket-url: redis://:VduA92A5RME@redis-sentinel.redis-sentinel.svc.cluster.local:6379/2
-cache-url: redis://:VduA92A5RME@redis-sentinel.redis-sentinel.svc.cluster.local:6379/3
+postgres-password: admin123
+postgres-user: ragsystemuser
+postgres-password-user: rag322wq
+postgres-db: ragsystemdb
+database-url: postgresql://ragsystemuser:rag322wq@postgres:5432/ragsystemdb
+```
+**⚠️ IMPORTANTE**: Cambiar estas contraseñas en producción.
+
+### 2. `redis-config` (namespace: rag-system)
+```yaml
+websocket-url: redis://redis-service:6379/1
+cache-url: redis://redis-service:6379/0
 ```
 
-### 2. `openwebui-secret` (namespace: rag-system)
+### 3. `openwebui-secret` (namespace: rag-system)
 ```yaml
 secret-key: 050cde99ea744214e7b714b7079954eac37a94c5338730a4e6762ba3eba92cb6
 ```
 **⚠️ CRÍTICO**: Esta clave debe ser la misma en todas las réplicas. No cambiarla una vez en producción.
-
-### 3. `redis-sentinel` (namespace: redis-sentinel)
-Contraseña del cluster Redis Sentinel (compartida con otras aplicaciones).
 
 ---
 
@@ -168,10 +191,10 @@ PDF_EXTRACT_IMAGES: True
 
 ### Configuración Base de Datos (Multi-replica)
 ```yaml
-DATABASE_URL: postgresql://ragsystemuser:rag322wq@10.16.25.12:5432/ragsystemdb
+DATABASE_URL: postgresql://ragsystemuser:rag322wq@postgres:5432/ragsystemdb
 WEBSOCKET_MANAGER: redis
-WEBSOCKET_REDIS_URL: (desde secret redis-config)
-REDIS_URL: (desde secret redis-config)
+WEBSOCKET_REDIS_URL: redis://redis-service:6379/1
+REDIS_URL: redis://redis-service:6379/0
 WEBUI_SECRET_KEY: (desde secret openwebui-secret)
 ```
 
@@ -261,13 +284,14 @@ Al desplegar por primera vez con PostgreSQL:
 
 ### Problema: Pods en CrashLoopBackOff
 **Causas posibles**:
-- PostgreSQL inaccesible (verificar conectividad a 10.16.25.12:5432)
-- Redis inaccesible (verificar secret redis-config)
+- PostgreSQL no está listo (verificar pod postgresql)
+- Redis inaccesible (verificar pod redis)
 - PVC no puede montarse (verificar que Longhorn soporte ReadWriteMany)
 
 **Verificación**:
 ```bash
 kubectl logs -n rag-system -l app=open-webui --tail=100
+kubectl get pods -n rag-system  # Verificar estado de PostgreSQL y Redis
 ```
 
 ### Problema: Usuarios deslogueados aleatoriamente
@@ -311,13 +335,17 @@ kubectl logs -n rag-system -l app=open-webui --tail=50 -f
 ### Verificar conectividad Redis
 ```bash
 kubectl exec -n rag-system deployment/open-webui -- \
-  redis-cli -h redis-sentinel.redis-sentinel.svc.cluster.local -a VduA92A5RME ping
+  redis-cli -h redis-service ping
 ```
 
 ### Verificar conectividad PostgreSQL
 ```bash
 kubectl exec -n rag-system deployment/open-webui -- \
-  nc -zv 10.16.25.12 5432
+  nc -zv postgres 5432
+
+# O conectarse directamente a PostgreSQL
+kubectl exec -n rag-system statefulset/postgresql -- \
+  psql -U ragsystemuser -d ragsystemdb -c "SELECT version();"
 ```
 
 ### Escalar manualmente
@@ -337,13 +365,17 @@ kubectl describe hpa open-webui-hpa -n rag-system
 
 | Archivo | Descripción |
 |---------|-------------|
+| `00-configmap.yaml` | ConfigMap con configuración de servicios |
 | `01-storage.yaml` | PVCs para Open WebUI, Qdrant, LlamaIndex |
 | `02-qdrant.yaml` | Deployment y Service de Qdrant |
 | `03-secrets.yaml` | Secrets de Redis y Open WebUI |
 | `04-openwebui.yaml` | Deployment, Service e Ingress de Open WebUI |
-| `05-llamaindex.yaml` | Deployment y Service de LlamaIndex |
-| `06-hpa.yaml` | HorizontalPodAutoscaler para Open WebUI |
-| `INFRASTRUCTURE.md` | Diagrama de arquitectura Mermaid |
+| `05-hpa.yaml` | HorizontalPodAutoscaler para Open WebUI |
+| `06-pipeline.yaml` | Deployment de pipelines personalizados |
+| `07-docling-gpu.yaml` | Servicio de procesamiento de documentos con GPU |
+| `08-redis.yaml` | StatefulSet y Service de Redis |
+| `09-postgresql.yaml` | StatefulSet, Service y Secrets de PostgreSQL |
+| `kustomization.yaml` | Archivo principal de Kustomize |
 
 ---
 
@@ -351,12 +383,14 @@ kubectl describe hpa open-webui-hpa -n rag-system
 
 Para problemas o consultas sobre este despliegue:
 - Namespace: `rag-system`
-- Owner: ARBA (Agencia de Recaudación de Buenos Aires)
-- Entorno: Test/Staging
+- Owner: Colegio de Técnicos de la Provincia de Buenos Aires
+- Entorno: Producción
 
 ---
 
-**Última actualización**: 2025-11-14
+**Última actualización**: 2025-12-10
 **Versión de Open WebUI**: main (latest)
 **Modelo LLM**: Qwen 2.5 14B Instruct
 **Modelo Embedding**: Qwen3 Embedding 0.6B
+**PostgreSQL**: 16-alpine (interno)
+**Redis**: 7-alpine (interno)

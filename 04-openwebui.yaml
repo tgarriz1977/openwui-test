@@ -56,7 +56,7 @@ spec:
         - name: RAG_EMBEDDING_MODEL
           value: "Qwen/Qwen3-Embedding-0.6B"
         - name: RAG_OPENAI_API_BASE_URL
-          value: "https://qwen-embedding.test.arba.gov.ar/v1"
+          value: "https://qwen-embedding.colegio-tecnicos.edu.ar/v1"
         - name: RAG_OPENAI_API_KEY
           value: "sk-dummy-key"
 
@@ -86,7 +86,10 @@ spec:
 
         # Configuración PostgreSQL (para escalado horizontal)
         - name: DATABASE_URL
-          value: "postgresql://ragsystemuser:rag322wq@10.16.25.12:5432/ragsystemdb"
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: database-url
 
         # Configuración Redis (WebSocket y cache para múltiples réplicas)
         - name: WEBSOCKET_MANAGER
@@ -171,7 +174,7 @@ metadata:
     nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
 spec:
   rules:
-  - host: asistente.test.arba.gov.ar
+  - host: asistente.colegio-tecnicos.edu.ar
     http:
       paths:
       - path: /

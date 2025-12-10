@@ -14,6 +14,7 @@ resources:
   - 06-pipeline.yaml
   - 07-docling-gpu.yaml
   - 08-redis.yaml
+  - 09-postgresql.yaml
 
 # Configuración común para todos los recursos
 commonLabels:
