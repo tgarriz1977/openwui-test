@@ -1,38 +1,42 @@
+# PersistentVolumeClaims para RAG System
+#
+# IMPORTANTE: Antes de aplicar cambios en PVCs existentes:
+# 1. Hacer backup de los datos
+# 2. Proteger los PVs existentes: kubectl patch pv <pv-name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+#
+---
+# Qdrant - Base de datos vectorial (datos críticos)
+# Usa gp3-retain: expansión habilitada, datos protegidos, buen I/O
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: qdrant-storage
   namespace: rag-system
+  labels:
+    app: qdrant
+    component: storage
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 100Gi
-  storageClassName: longhorn # Ajustar según tu storage class
+  storageClassName: gp3-retain  # GP3 con expansión + Retain policy
 ---
+# OpenWebUI - Aplicación principal (1-3 réplicas con HPA)
+# Usa efs-sc-direct: necesita ReadWriteMany para múltiples pods
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: openwebui-storage
   namespace: rag-system
+  labels:
+    app: open-webui
+    component: storage
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteMany  # Requerido para HPA con múltiples réplicas
   resources:
     requests:
       storage: 20Gi
-  storageClassName: longhorn
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: llamaindex-storage
-  namespace: rag-system
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: longhorn
+  storageClassName: efs-sc-direct  # EFS con Retain policy para compartir entre pods
