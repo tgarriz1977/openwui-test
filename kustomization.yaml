@@ -8,10 +8,7 @@ resources:
   - 02-qdrant.yaml
   - 03-secrets.yaml
   - 04-openwebui.yaml
-  #- 05-hpa.yaml
-  #- 06-pipeline.yaml
   - 07-docling.yaml
-  #- 08-redis.yaml
   - 09-postgresql.yaml
 
 # Configuración común para todos los recursos
