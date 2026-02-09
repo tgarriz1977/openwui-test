@@ -4,15 +4,13 @@ kind: Kustomization
 namespace: rag-system
 
 resources:
-  - 00-configmap.yaml
   - 01-storage.yaml
   - 02-qdrant.yaml
-  #- 03-llamaindex-api.yaml
   - 03-secrets.yaml
   - 04-openwebui.yaml
-  - 05-hpa.yaml
-  - 06-pipeline.yaml
-  - 07-docling-gpu.yaml
+  #- 05-hpa.yaml
+  #- 06-pipeline.yaml
+  - 07-docling.yaml
   - 08-redis.yaml
   - 09-postgresql.yaml
 
@@ -33,17 +31,3 @@ images:
     newTag: main
   - name: qdrant/qdrant
     newTag: v1.16
-
-# ConfigMap generator (alternativa a archivos estáticos)
-# configMapGenerator:
-#   - name: rag-config
-#     literals:
-#       - CHUNK_SIZE=1000
-#       - CHUNK_OVERLAP=200
-#       - RAG_TOP_K=20
-#       - RERANK_TOP_N=5
-
-# Patches estratégicos para diferentes entornos
-# patchesStrategicMerge:
-#   - overlays/production/resources.yaml
-#   - overlays/production/replicas.yaml

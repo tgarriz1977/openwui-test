@@ -17,8 +17,6 @@ spec:
       labels:
         app: qdrant
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: rke2test-w02
       containers:
       - name: qdrant
         image: qdrant/qdrant:v1.16

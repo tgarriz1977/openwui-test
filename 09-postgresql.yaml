@@ -25,10 +25,9 @@ type: Opaque
 stringData:
   postgres-password: "admin123"
   postgres-user: "ragsystemuser"
-  postgres-password-user: "rag322wq"
   postgres-db: "ragsystemdb"
   # URL de conexión completa para Open WebUI
-  database-url: "postgresql://ragsystemuser:rag322wq@postgres:5432/ragsystemdb"
+  database-url: "postgresql://ragsystemuser:admin123@postgres:5432/ragsystemdb"
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -70,13 +69,6 @@ spec:
             secretKeyRef:
               name: postgresql-secret
               key: postgres-user
-
-        # Password del usuario de aplicación
-        - name: POSTGRES_PASSWORD_USER
-          valueFrom:
-            secretKeyRef:
-              name: postgresql-secret
-              key: postgres-password-user
 
         # Base de datos inicial
         - name: POSTGRES_DB

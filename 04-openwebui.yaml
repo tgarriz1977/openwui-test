@@ -15,8 +15,6 @@ spec:
       labels:
         app: open-webui
     spec:
-      imagePullSecrets:
-        - name: harbor-secret
       containers:
       - name: open-webui
         image: ghcr.io/open-webui/open-webui:main
@@ -35,51 +33,13 @@ spec:
         # Configuración de Pipelines (sistema de pipelines personalizados)
         - name: PIPELINES_URLS
           value: "http://pipelines-service:9099"
-
-        # Configuración LLM primario (Qwen 2.5 14B)
-        - name: OPENAI_API_BASE_URL
-          value: "http://simplevllm-svc.simplevllm.svc.cluster.local:8000/v1"
-        - name: OPENAI_API_KEY
-          value: "sk-dummy-key"
-        - name: DEFAULT_MODELS
-          value: "Qwen/Qwen2.5-14B-Instruct"
         
         # Configuración Vector DB (Qdrant)
         - name: VECTOR_DB
           value: "qdrant"
         - name: QDRANT_URI
           value: "http://qdrant-service:6333"
-        
-        # Configuración Embeddings
-        - name: RAG_EMBEDDING_ENGINE
-          value: "openai"
-        - name: RAG_EMBEDDING_MODEL
-          value: "Qwen/Qwen3-Embedding-0.6B"
-        - name: RAG_OPENAI_API_BASE_URL
-          value: "https://qwen-embedding.colegio-tecnicos.edu.ar/v1"
-        - name: RAG_OPENAI_API_KEY
-          value: "sk-dummy-key"
-
-        # Configuración Reranker
-        - name: RAG_RERANKING_MODEL
-          value: "BAAI/bge-reranker-v2-m3"
-        - name: RERANKING_API_BASE_URL
-          value: "http://rerank-baai-service.rerankers.svc.cluster.local/rerank"
-        
-        # Configuración RAG mejorada
-        - name: CHUNK_SIZE
-          value: "1000"
-        - name: CHUNK_OVERLAP
-          value: "200"
-        - name: RAG_TOP_K
-          value: "20"
-        - name: ENABLE_RAG_HYBRID_SEARCH
-          value: "True"
-        - name: ENABLE_RAG_WEB_LOADER
-          value: "True"
-        - name: PDF_EXTRACT_IMAGES
-          value: "True"
-        
+       
         # URL del servicio LlamaIndex (para pipelines personalizados)
         #- name: LLAMAINDEX_API_URL
         #  value: "http://llamaindex-api-service:8000"
@@ -174,7 +134,7 @@ metadata:
     nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
 spec:
   rules:
-  - host: asistente.colegio-tecnicos.edu.ar
+  - host: asistente.tecnicos.org.ar
     http:
       paths:
       - path: /
