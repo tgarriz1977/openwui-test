@@ -13,8 +13,6 @@ spec:
       labels:
         app: docling
     spec:
-      imagePullSecrets:
-      - name: harbor-secret
       containers:
       - name: docling
         image: quay.io/docling-project/docling-serve
