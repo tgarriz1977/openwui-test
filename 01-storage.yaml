@@ -23,8 +23,7 @@ spec:
       storage: 20Gi
   storageClassName: gp3-delete  # GP3 con expansión, cleanup automático (backups via Velero)
 ---
-# OpenWebUI - Aplicación principal (1-3 réplicas con HPA)
-# Usa efs-sc-direct: necesita ReadWriteMany para múltiples pods
+# OpenWebUI - Aplicación principal
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -35,8 +34,8 @@ metadata:
     component: storage
 spec:
   accessModes:
-    - ReadWriteMany  # Requerido para HPA con múltiples réplicas
+    - ReadWriteOnce
   resources:
     requests:
       storage: 20Gi
-  storageClassName: efs-sc-direct  # EFS con Retain policy para compartir entre pods
+  storageClassName: gp3-delete  # GP3 con expansión, cleanup automático (backups via Velero)
