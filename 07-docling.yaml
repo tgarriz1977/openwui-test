@@ -13,10 +13,12 @@ spec:
       labels:
         app: docling
     spec:
+
       containers:
       - name: docling
         image: quay.io/docling-project/docling-serve
         imagePullPolicy: IfNotPresent
+        revisionHistoryLimit: 2
         ports:
         - containerPort: 5001
           name: http
