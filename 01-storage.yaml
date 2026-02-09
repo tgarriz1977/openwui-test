@@ -21,7 +21,7 @@ spec:
   resources:
     requests:
       storage: 20Gi
-  storageClassName: gp3-retain  # GP3 con expansión + Retain policy
+  storageClassName: gp3-delete  # GP3 con expansión, cleanup automático (backups via Velero)
 ---
 # OpenWebUI - Aplicación principal (1-3 réplicas con HPA)
 # Usa efs-sc-direct: necesita ReadWriteMany para múltiples pods

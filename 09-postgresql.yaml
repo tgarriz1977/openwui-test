@@ -14,7 +14,7 @@ spec:
   resources:
     requests:
       storage: 20Gi  # Aumentado de 10Gi para evitar quedarse sin espacio
-  storageClassName: gp3-retain  # GP3 con expansión + Retain policy
+  storageClassName: gp3-delete  # GP3 con expansión, cleanup automático (backups via Velero)
 ---
 apiVersion: v1
 kind: Secret
