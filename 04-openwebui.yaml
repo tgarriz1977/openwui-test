@@ -15,6 +15,7 @@ spec:
       labels:
         app: open-webui
     spec:
+      serviceAccountName: openwebui-bedrock-sa
       containers:
       - name: open-webui
         image: ghcr.io/open-webui/open-webui:main
