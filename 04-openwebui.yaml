@@ -31,7 +31,10 @@ spec:
           value: "True"
         - name: WEBUI_NAME
           value: "RAG System"
-        
+        - name: OPENAI_API_BASE_URL
+          value: "http://bedrock-gateway.rag-system.svc.cluster.local:80/api/v1"
+        - name: OPENAI_API_KEY
+          value: "bedrock-gateway-internal-key-2026"
         # Configuración de Pipelines (sistema de pipelines personalizados)
         - name: PIPELINES_URLS
           value: "http://pipelines-service:9099"
