@@ -1,20 +1,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    deployment.kubernetes.io/revision: "6"
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app":"bedrock-gateway"},"name":"bedrock-gateway","namespace":"rag-system"},"spec":{"replicas":1,"revisionHistoryLimit":2,"selector":{"matchLabels":{"app":"bedrock-gateway"}},"template":{"metadata":{"labels":{"app":"bedrock-gateway"}},"spec":{"containers":[{"env":[{"name":"AWS_REGION","value":"us-east-2"},{"name":"API_KEY_PARAM_NAME","valueFrom":{"secretKeyRef":{"key":"api-key","name":"bedrock-gateway-secret"}}},{"name":"DEFAULT_MODEL","value":"anthropic.claude-sonnet-4-20250514-v1:0"},{"name":"DEBUG","value":"false"}],"image":"982170164096.dkr.ecr.us-east-2.amazonaws.com/bedrock-access-gateway:latest","livenessProbe":{"httpGet":{"path":"/health","port":80},"initialDelaySeconds":15,"periodSeconds":30},"name":"bedrock-gateway","ports":[{"containerPort":80}],"readinessProbe":{"httpGet":{"path":"/api/v1/models","port":80},"initialDelaySeconds":10,"periodSeconds":15},"resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"250m","memory":"256Mi"}}}],"serviceAccountName":"openwebui-bedrock-sa"}}}}
-  creationTimestamp: "2026-02-10T03:26:19Z"
-  generation: 6
   labels:
     app: bedrock-gateway
   name: bedrock-gateway
   namespace: rag-system
-  resourceVersion: "192675705"
-  uid: 697eb261-baf7-4e95-a32d-216db9f397dd
 spec:
-  progressDeadlineSeconds: 600
   replicas: 1
   revisionHistoryLimit: 2
   selector:
@@ -27,8 +18,6 @@ spec:
     type: RollingUpdate
   template:
     metadata:
-      annotations:
-        kubectl.kubernetes.io/restartedAt: "2026-02-10T03:33:49Z"
       labels:
         app: bedrock-gateway
     spec:
@@ -81,31 +70,20 @@ spec:
           requests:
             cpu: 250m
             memory: 256Mi
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext: {}
-      serviceAccount: openwebui-bedrock-sa
       serviceAccountName: openwebui-bedrock-sa
-      terminationGracePeriodSeconds: 30
-status:
-  availableReplicas: 1
-  conditions:
-  - lastTransitionTime: "2026-02-10T03:37:41Z"
-    lastUpdateTime: "2026-02-10T03:37:41Z"
-    message: Deployment has minimum availability.
-    reason: MinimumReplicasAvailable
-    status: "True"
-    type: Available
-  - lastTransitionTime: "2026-02-10T03:26:19Z"
-    lastUpdateTime: "2026-02-10T03:37:41Z"
-    message: ReplicaSet "bedrock-gateway-579fcf5748" has successfully progressed.
-    reason: NewReplicaSetAvailable
-    status: "True"
-    type: Progressing
-  observedGeneration: 6
-  readyReplicas: 1
-  replicas: 1
-  updatedReplicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: bedrock-gateway
+  name: bedrock-gateway
+  namespace: rag-system
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: bedrock-gateway
+  type: ClusterIP

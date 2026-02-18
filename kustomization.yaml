@@ -10,6 +10,8 @@ resources:
   - 04-openwebui.yaml
   - 07-docling.yaml
   - 09-postgresql.yaml
+  - bedrock-gw/bedrock-gateway-secret.yaml
+  - bedrock-gw/bedrock-gateway-deployment.yaml
 
 # Configuración común para todos los recursos
 commonLabels:
