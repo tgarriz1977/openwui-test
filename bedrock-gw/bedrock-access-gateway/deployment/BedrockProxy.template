@@ -1,0 +1,178 @@
+Description: Bedrock Access Gateway - OpenAI-compatible RESTful APIs for Amazon Bedrock (API Gateway + Lambda with Streaming)
+Parameters:
+  ApiKeySecretArn:
+    Type: String
+    AllowedPattern: ^arn:aws:secretsmanager:.*$
+    Description: The secret ARN in Secrets Manager used to store the API Key
+  ContainerImageUri:
+    Type: String
+    Description: The ECR image URI for the Lambda function (e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com/bedrock-proxy-api:latest)
+  DefaultModelId:
+    Type: String
+    Default: anthropic.claude-3-sonnet-20240229-v1:0
+    Description: The default model ID, please make sure the model ID is supported in the current region
+  EnablePromptCaching:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable prompt caching for supported models (Claude, Nova). When enabled, adds cachePoint to system prompts and messages for cost savings.
+Resources:
+  # IAM Role for Lambda
+  ProxyApiHandlerServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  ProxyApiHandlerServiceRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - bedrock:ListFoundationModels
+              - bedrock:ListInferenceProfiles
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - bedrock:InvokeModel
+              - bedrock:InvokeModelWithResponseStream
+            Effect: Allow
+            Resource:
+              - arn:aws:bedrock:*::foundation-model/*
+              - arn:aws:bedrock:*:*:inference-profile/*
+              - arn:aws:bedrock:*:*:application-inference-profile/*
+          - Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:DescribeSecret
+            Effect: Allow
+            Resource: !Ref ApiKeySecretArn
+        Version: "2012-10-17"
+      PolicyName: ProxyApiHandlerServiceRoleDefaultPolicy
+      Roles:
+        - !Ref ProxyApiHandlerServiceRole
+
+  # Lambda Function with Lambda Web Adapter for streaming
+  ProxyApiHandler:
+    Type: AWS::Lambda::Function
+    Properties:
+      Architectures:
+        - arm64
+      Code:
+        ImageUri: !Ref ContainerImageUri
+      Description: Bedrock Proxy API Handler with Response Streaming
+      Environment:
+        Variables:
+          # Lambda Web Adapter settings
+          AWS_LWA_INVOKE_MODE: RESPONSE_STREAM
+          AWS_LWA_READINESS_CHECK_PATH: /health
+          AWS_LWA_ASYNC_INIT: "true"
+          PORT: "8080"
+          # Application settings
+          DEBUG: "false"
+          API_KEY_SECRET_ARN: !Ref ApiKeySecretArn
+          DEFAULT_MODEL: !Ref DefaultModelId
+          DEFAULT_EMBEDDING_MODEL: cohere.embed-multilingual-v3
+          ENABLE_CROSS_REGION_INFERENCE: "true"
+          ENABLE_APPLICATION_INFERENCE_PROFILES: "true"
+          ENABLE_PROMPT_CACHING: !Ref EnablePromptCaching
+          API_ROUTE_PREFIX: /v1
+      MemorySize: 1024
+      PackageType: Image
+      Role: !GetAtt ProxyApiHandlerServiceRole.Arn
+      Timeout: 600
+    DependsOn:
+      - ProxyApiHandlerServiceRoleDefaultPolicy
+      - ProxyApiHandlerServiceRole
+
+  # API Gateway REST API (Regional)
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: BedrockProxyApi
+      Description: Bedrock Access Gateway - OpenAI-compatible API with streaming support
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Body:
+        openapi: "3.0.1"
+        info:
+          title: BedrockProxyApi
+          version: "1.0"
+        paths:
+          /{proxy+}:
+            x-amazon-apigateway-any-method:
+              parameters:
+                - name: proxy
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2021-11-15/functions/${ProxyApiHandler.Arn}/response-streaming-invocations"
+                passthroughBehavior: when_no_match
+                timeoutInMillis: 600000
+                responseTransferMode: STREAM
+              responses:
+                default:
+                  description: Default response
+          /:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2021-11-15/functions/${ProxyApiHandler.Arn}/response-streaming-invocations"
+                passthroughBehavior: when_no_match
+                timeoutInMillis: 600000
+                responseTransferMode: STREAM
+              responses:
+                default:
+                  description: Default response
+
+  # Lambda Permission for API Gateway
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ProxyApiHandler
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*"
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref RestApi
+    DependsOn:
+      - RestApi
+
+  # API Gateway Stage
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      StageName: api
+      Description: API Stage with streaming support
+
+Outputs:
+  APIBaseUrl:
+    Description: Proxy API Base URL (OPENAI_API_BASE)
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/api/v1"
+  RestApiId:
+    Description: API Gateway REST API ID
+    Value: !Ref RestApi
+  LambdaFunctionArn:
+    Description: Lambda Function ARN
+    Value: !GetAtt ProxyApiHandler.Arn

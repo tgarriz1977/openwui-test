@@ -1,3 +1,9 @@
 resoluciones/
 bedrock/
-bedrock-gw/
+
+# Excluir archivos del repo upstream que no necesitamos en git
+bedrock-gw/bedrock-access-gateway/.pre-commit-config.yaml
+bedrock-gw/bedrock-access-gateway/.github/
+bedrock-gw/bedrock-access-gateway/docs/
+bedrock-gw/bedrock-access-gateway/*.md
+bedrock-gw/bedrock-access-gateway/LICENSE
