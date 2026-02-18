@@ -5,6 +5,7 @@ metadata:
   name: docling
 spec:
   replicas: 1
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       app: docling
@@ -18,7 +19,6 @@ spec:
       - name: docling
         image: quay.io/docling-project/docling-serve
         imagePullPolicy: IfNotPresent
-        revisionHistoryLimit: 2
         ports:
         - containerPort: 5001
           name: http
