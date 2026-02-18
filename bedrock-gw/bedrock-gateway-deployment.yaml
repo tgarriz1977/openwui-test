@@ -40,6 +40,10 @@ spec:
           value: anthropic.claude-sonnet-4-20250514-v1:0
         - name: DEBUG
           value: "false"
+        - name: RERANK_REGION
+          value: us-east-1
+        - name: DEFAULT_RERANK_MODEL
+          value: "cohere.rerank-v3-5:0"
         - name: API_KEY_SECRET_ARN
           value: BedrockGatewayApiKey
         - name: AWS_DEFAULT_REGION
