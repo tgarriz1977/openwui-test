@@ -49,7 +49,7 @@ spec:
         - name: AWS_DEFAULT_REGION
           value: us-east-2
         image: 982170164096.dkr.ecr.us-east-2.amazonaws.com/bedrock-access-gateway:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
           httpGet:
