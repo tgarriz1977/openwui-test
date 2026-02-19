@@ -10,7 +10,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: qdrant-storage
+  name: qdrant-storage-v2
   namespace: rag-system
   labels:
     app: qdrant

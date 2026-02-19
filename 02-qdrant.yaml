@@ -57,7 +57,7 @@ spec:
       volumes:
       - name: storage
         persistentVolumeClaim:
-          claimName: qdrant-storage
+          claimName: qdrant-storage-v2
 ---
 apiVersion: v1
 kind: Service
