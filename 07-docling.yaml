@@ -27,6 +27,8 @@ spec:
           value: tesseract
         - name: DOCLING_OCR_LANG
           value: spa,eng
+        - name: DOCLING_SERVE_MAX_SYNC_WAIT
+          value: "300"
         livenessProbe:
           httpGet:
             path: /health
@@ -48,7 +50,7 @@ spec:
             cpu: 500m
             memory: 1Gi
           limits:
-            cpu: 4000m
+            cpu: 6000m
             memory: 5Gi
 ---
 apiVersion: v1
