@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: qdrant
+  name: qdrant-v2
   namespace: rag-system
   labels:
-    app: qdrant
+    app: qdrant-v2
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: qdrant
+      app: qdrant-v2
   template:
     metadata:
       labels:
-        app: qdrant
+        app: qdrant-v2
     spec:
       containers:
       - name: qdrant
@@ -65,7 +65,7 @@ metadata:
   name: qdrant-service
   namespace: rag-system
   labels:
-    app: qdrant
+    app: qdrant-v2
 spec:
   type: ClusterIP
   ports:
@@ -78,4 +78,4 @@ spec:
     protocol: TCP
     name: grpc
   selector:
-    app: qdrant
+    app: qdrant-v2

@@ -13,7 +13,7 @@ metadata:
   name: qdrant-storage-v2
   namespace: rag-system
   labels:
-    app: qdrant
+    app: qdrant-v2
     component: storage
 spec:
   accessModes:
