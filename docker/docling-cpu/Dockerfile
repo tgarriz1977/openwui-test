@@ -1,21 +1,21 @@
-# Dockerfile para Docling con extracción mejorada de tablas
-# Basado en quay.io/docling-project/docling-serve con pdfplumber agregado
-
 FROM quay.io/docling-project/docling-serve:latest
 
-# Instalar dependencias Python adicionales (sin apt-get, la base no lo tiene)
+USER root
+
+# Instalar dependencias necesarias
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Copiar la aplicación mejorada
-COPY app.py /app/app.py
+# Instalar docling-core para acceder a los tipos de elementos
+RUN pip install --no-cache-dir docling-core
 
-# Puerto por defecto de docling-serve
+# Copiar la aplicación
+COPY app.py /opt/app-root/src/app.py
+
+USER 1001
+
+WORKDIR /opt/app-root/src
+
 EXPOSE 5001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5001/health')" || exit 1
-
-# Comando de inicio (igual que el original)
 CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5001"]
