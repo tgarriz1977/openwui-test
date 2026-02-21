@@ -1,8 +1,14 @@
 ---
+# Deployment de Docling con extracción mejorada de tablas
+# Versión mejorada con pdfplumber para tablas financieras
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: docling
+  namespace: rag-system
+  labels:
+    app: docling
+    version: enhanced
 spec:
   replicas: 1
   revisionHistoryLimit: 2
@@ -13,8 +19,8 @@ spec:
     metadata:
       labels:
         app: docling
+        version: enhanced
     spec:
-
       containers:
       - name: docling
         image: 982170164096.dkr.ecr.us-east-2.amazonaws.com/docling-serve-enhanced:latest
@@ -22,6 +28,7 @@ spec:
         ports:
         - containerPort: 5001
           name: http
+          protocol: TCP
         env:
         - name: DOCLING_OCR_ENGINE
           value: tesseract
@@ -29,11 +36,13 @@ spec:
           value: spa,eng
         - name: DOCLING_SERVE_MAX_SYNC_WAIT
           value: "600"
+        - name: PYTHONUNBUFFERED
+          value: "1"
         livenessProbe:
           httpGet:
             path: /health
             port: http
-          initialDelaySeconds: 20
+          initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
@@ -41,7 +50,7 @@ spec:
           httpGet:
             path: /health
             port: http
-          initialDelaySeconds: 10
+          initialDelaySeconds: 15
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
@@ -57,10 +66,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: docling
+  namespace: rag-system
+  labels:
+    app: docling
 spec:
   selector:
     app: docling
   ports:
   - port: 5001
     targetPort: http
-
+    protocol: TCP

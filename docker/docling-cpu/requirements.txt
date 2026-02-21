@@ -1,0 +1,4 @@
+# Dependencias adicionales para extracción mejorada de tablas
+pdfplumber>=0.10.0
+pandas>=2.0.0
+openpyxl>=3.1.0
