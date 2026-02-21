@@ -260,7 +260,10 @@ def root():
 
 
 @app.post("/v1/convert/file")
-def convert(file: UploadFile = File(...)):
+def convert(
+    file: Optional[UploadFile] = File(None),
+    files: Optional[UploadFile] = File(None)
+):
     """
     Convierte un PDF a Markdown con extracción mejorada de tablas.
     
@@ -273,8 +276,18 @@ def convert(file: UploadFile = File(...)):
     Returns:
         JSON con el texto extraído en formato Markdown
     """
+    # OpenWebUI usa 'files' (plural), nosotros esperamos 'file' (singular)
+    # Aceptamos ambos para compatibilidad
+    uploaded_file = file or files
+    
+    if not uploaded_file:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Field required: file o files"
+        )
+    
     # Validar tipo de archivo
-    if file.content_type not in ("application/pdf", "application/octet-stream"):
+    if uploaded_file.content_type not in ("application/pdf", "application/octet-stream"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Se requiere un archivo PDF"
@@ -282,8 +295,8 @@ def convert(file: UploadFile = File(...)):
     
     try:
         # Leer contenido
-        content = file.file.read()
-        logger.info(f"Procesando archivo: {file.filename} ({len(content)} bytes)")
+        content = uploaded_file.file.read()
+        logger.info(f"Procesando archivo: {uploaded_file.filename} ({len(content)} bytes)")
         
         # Paso 1: Extraer tablas con pdfplumber (mejor para tablas)
         tables = []
