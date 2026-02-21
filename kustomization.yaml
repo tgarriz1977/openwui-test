@@ -27,6 +27,6 @@ commonLabels:
 # Imágenes - útil para cambiar versiones sin editar YAMLs
 images:
   - name: ghcr.io/open-webui/open-webui
-    newTag: main
+    newTag: v0.8.3
   - name: qdrant/qdrant
     newTag: v1.16
