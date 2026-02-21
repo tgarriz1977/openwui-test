@@ -73,10 +73,9 @@ def clean_cell(cell) -> str:
     return text
 
 
-def extract_financial_tables_with_pdfplumber(pdf_bytes: bytes) -> List[FinancialTable]:
+def extract_all_tables_with_pdfplumber(pdf_bytes: bytes) -> List[FinancialTable]:
     """
-    Extrae SOLO tablas financieras usando pdfplumber.
-    Esta función es el CORE para tablas bien formateadas.
+    Extrae TODAS las tablas usando pdfplumber (no solo financieras).
     """
     tables = []
     
@@ -104,20 +103,21 @@ def extract_financial_tables_with_pdfplumber(pdf_bytes: bytes) -> List[Financial
                     if not cleaned or len(cleaned) < 2:
                         continue
                     
-                    # Solo procesar tablas financieras
-                    if is_financial_table(cleaned):
-                        # Detectar título de la tabla (buscar en las primeras filas)
-                        title = f"Tabla Financiera (Página {page_num})"
-                        headers = cleaned[0] if cleaned else []
-                        rows = cleaned[1:] if len(cleaned) > 1 else []
-                        
-                        tables.append(FinancialTable(
-                            page=page_num,
-                            title=title,
-                            headers=headers,
-                            rows=rows
-                        ))
-                        logger.info(f"Tabla financiera encontrada en página {page_num}: {len(rows)} filas")
+                    # Detectar si es tabla financiera para el título
+                    is_financial = is_financial_table(cleaned)
+                    table_type = "Financiera" if is_financial else "General"
+                    title = f"Tabla {table_type} (Página {page_num})"
+                    
+                    headers = cleaned[0] if cleaned else []
+                    rows = cleaned[1:] if len(cleaned) > 1 else []
+                    
+                    tables.append(FinancialTable(
+                        page=page_num,
+                        title=title,
+                        headers=headers,
+                        rows=rows
+                    ))
+                    logger.info(f"Tabla {table_type} encontrada página {page_num}: {len(rows)} filas")
         
     except Exception as e:
         logger.error(f"Error con pdfplumber: {e}")
@@ -125,15 +125,18 @@ def extract_financial_tables_with_pdfplumber(pdf_bytes: bytes) -> List[Financial
     return tables
 
 
-def format_table_to_markdown(table: FinancialTable) -> str:
-    """Formatea una tabla financiera a Markdown profesional."""
+def format_table_to_markdown(table: FinancialTable, table_number: int = None) -> str:
+    """Formatea una tabla a Markdown profesional."""
     if not table.rows:
         return ""
     
     lines = []
     
     # Título de la tabla
-    lines.append(f"### {table.title}")
+    if table_number:
+        lines.append(f"### Tabla {table_number}: {table.title}")
+    else:
+        lines.append(f"### {table.title}")
     lines.append("")
     
     # Calcular número máximo de columnas
@@ -164,21 +167,21 @@ def format_table_to_markdown(table: FinancialTable) -> str:
 def process_document(pdf_bytes: bytes, filename: str) -> str:
     """
     Procesa el documento:
-    1. Extrae texto con Docling
-    2. Extrae tablas financieras con pdfplumber (reemplaza las de Docling)
-    3. Combina resultado
+    1. Extrae SOLO TEXTO con Docling (ignora sus tablas malformadas)
+    2. Extrae tablas financieras con pdfplumber (mejor calidad)
+    3. Combina resultado limpio
     """
-    # Paso 1: Docling para texto base
+    # Paso 1: Docling para TEXTO SOLAMENTE
     logger.info("Extrayendo texto con Docling...")
     doc_stream = DocumentStream(name=filename, stream=io.BytesIO(pdf_bytes))
     result = converter.convert(doc_stream)
     
-    # Obtener texto plano (sin tablas malformadas)
+    # Obtener SOLO TEXTO (export_to_text() no incluye tablas)
     base_text = result.document.export_to_text()
     
-    # Paso 2: pdfplumber para tablas financieras
-    logger.info("Extrayendo tablas financieras con pdfplumber...")
-    financial_tables = extract_financial_tables_with_pdfplumber(pdf_bytes)
+    # Paso 2: pdfplumber para TODAS las tablas (no solo financieras)
+    logger.info("Extrayendo tablas con pdfplumber...")
+    all_tables = extract_all_tables_with_pdfplumber(pdf_bytes)
     
     # Paso 3: Construir documento final
     sections = []
@@ -188,18 +191,16 @@ def process_document(pdf_bytes: bytes, filename: str) -> str:
     sections.append("")
     sections.append(base_text)
     
-    # Agregar tablas financieras bien formateadas
-    if financial_tables:
+    # Agregar tablas bien formateadas al final
+    if all_tables:
         sections.append("")
         sections.append("---")
         sections.append("")
-        sections.append("## 📊 Tablas Financieras Detalladas")
-        sections.append("")
-        sections.append("*Las siguientes tablas fueron extraídas con procesamiento especializado:*")
+        sections.append("## 📊 Tablas Extraídas del Documento")
         sections.append("")
         
-        for table in financial_tables:
-            sections.append(format_table_to_markdown(table))
+        for i, table in enumerate(all_tables, 1):
+            sections.append(format_table_to_markdown(table, i))
     
     return "\n".join(sections)
 
@@ -245,8 +246,8 @@ def convert(
         markdown = process_document(content, uploaded_file.filename)
         
         # Contar tablas encontradas
-        table_count = markdown.count("### Tabla Financiera")
-        logger.info(f"Procesamiento completado. Tablas financieras: {table_count}")
+        table_count = markdown.count("### Tabla")
+        logger.info(f"Procesamiento completado. Tablas extraídas: {table_count}")
         
         return JSONResponse({
             "document": {
@@ -256,7 +257,7 @@ def convert(
             "metadata": {
                 "filename": uploaded_file.filename,
                 "original_size": len(content),
-                "financial_tables": table_count,
+                "tables_extracted": table_count,
                 "processor": "docling-text+pdfplumber-tables"
             }
         })
