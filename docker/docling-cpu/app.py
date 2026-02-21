@@ -1,27 +1,25 @@
 """
-Docling Serve con extracción mejorada de tablas usando pdfplumber como respaldo.
+Docling Serve con extracción especializada de tablas usando pdfplumber.
 
-Este módulo extiende docling-serve para:
-1. Usar Docling nativo para texto y tablas (export_to_markdown incluye tablas)
-2. Usar pdfplumber solo para tablas financieras complejas que Docling no detecte bien
-3. Combinar ambos resultados inteligentemente
+Estrategia:
+1. Docling para texto y estructura general
+2. pdfplumber EXCLUSIVAMENTE para tablas financieras (mejor precisión)
+3. Reemplazar tablas malformadas de Docling con tablas limpias de pdfplumber
 
 Mantiene compatibilidad 100% con la API de docling-serve original.
 """
 
 import io
-import json
+import re
 import logging
-from typing import List, Dict, Optional, Any
-from pathlib import Path
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.responses import JSONResponse
 from docling.document_converter import DocumentConverter
-from docling.datamodel.base_models import InputFormat, DocumentStream
+from docling.datamodel.base_models import DocumentStream
 
-# Intentar importar pdfplumber (opcional pero recomendado)
 try:
     import pdfplumber
     PDFPLUMBER_AVAILABLE = True
@@ -29,29 +27,61 @@ except ImportError:
     PDFPLUMBER_AVAILABLE = False
     logging.warning("pdfplumber no disponible")
 
-# Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Crear aplicación FastAPI (compatible con docling-serve)
 app = FastAPI(
-    title="Docling Serve - Mejorado para Tablas Financieras",
-    description="Extensión de docling-serve con pdfplumber para tablas complejas",
-    version="2.1.0"
+    title="Docling Serve - Tablas Financieras Optimizadas",
+    version="2.2.0"
 )
 
-# Inicializar converter de docling
 converter = DocumentConverter()
 
 
-def extract_tables_with_pdfplumber(pdf_bytes: bytes) -> List[Dict]:
+@dataclass
+class FinancialTable:
+    """Tabla financiera extraída."""
+    page: int
+    title: str
+    headers: List[str]
+    rows: List[List[str]]
+
+
+def is_financial_table(table_data: List[List[str]]) -> bool:
+    """Detecta si una tabla contiene datos financieros."""
+    if not table_data:
+        return False
+    
+    text = " ".join([str(cell) for row in table_data for cell in row if cell]).upper()
+    
+    financial_keywords = [
+        '$', 'PESOS', 'PRESUPUESTO', 'TESORERIA', 'TESORERÍA', 
+        'RECAUDACION', 'INGRESO', 'EGRESO', 'TOTAL', 'SALDO',
+        'CUOTA', 'BALANCE', 'FINANCIERO', 'ECONOMICO', 'PARTIDA',
+        'MATRICULA', 'MATRÍCULA', 'GASTOS', 'SUELDOS', 'VIATICOS'
+    ]
+    
+    return any(keyword in text for keyword in financial_keywords)
+
+
+def clean_cell(cell) -> str:
+    """Limpia el contenido de una celda."""
+    if cell is None:
+        return ""
+    text = str(cell).replace('\n', ' ').strip()
+    text = ' '.join(text.split())  # Normalizar espacios
+    return text
+
+
+def extract_financial_tables_with_pdfplumber(pdf_bytes: bytes) -> List[FinancialTable]:
     """
-    Extrae tablas usando pdfplumber como respaldo.
-    Solo usado si Docling no detecta tablas financieras.
+    Extrae SOLO tablas financieras usando pdfplumber.
+    Esta función es el CORE para tablas bien formateadas.
     """
     tables = []
     
     if not PDFPLUMBER_AVAILABLE:
+        logger.warning("pdfplumber no disponible")
         return tables
     
     try:
@@ -63,72 +93,133 @@ def extract_tables_with_pdfplumber(pdf_bytes: bytes) -> List[Dict]:
                     if not table or len(table) < 2:
                         continue
                     
-                    # Limpiar celdas
+                    # Limpiar datos
                     cleaned = []
                     for row in table:
-                        cleaned_row = [str(cell).replace('\n', ' ').strip() if cell else "" for cell in row]
-                        cleaned.append(cleaned_row)
+                        cleaned_row = [clean_cell(cell) for cell in row]
+                        # Ignorar filas vacías
+                        if any(cleaned_row):
+                            cleaned.append(cleaned_row)
                     
-                    tables.append({
-                        'page': page_num,
-                        'index': table_idx,
-                        'data': cleaned,
-                        'rows': len(cleaned)
-                    })
+                    if not cleaned or len(cleaned) < 2:
+                        continue
                     
-        logger.info(f"pdfplumber extrajo {len(tables)} tablas")
+                    # Solo procesar tablas financieras
+                    if is_financial_table(cleaned):
+                        # Detectar título de la tabla (buscar en las primeras filas)
+                        title = f"Tabla Financiera (Página {page_num})"
+                        headers = cleaned[0] if cleaned else []
+                        rows = cleaned[1:] if len(cleaned) > 1 else []
+                        
+                        tables.append(FinancialTable(
+                            page=page_num,
+                            title=title,
+                            headers=headers,
+                            rows=rows
+                        ))
+                        logger.info(f"Tabla financiera encontrada en página {page_num}: {len(rows)} filas")
         
     except Exception as e:
-        logger.warning(f"Error con pdfplumber: {e}")
+        logger.error(f"Error con pdfplumber: {e}")
     
     return tables
 
 
-def format_table_to_markdown(table_data: List[List[str]]) -> str:
-    """Formatea una tabla a Markdown."""
-    if not table_data or len(table_data) < 1:
+def format_table_to_markdown(table: FinancialTable) -> str:
+    """Formatea una tabla financiera a Markdown profesional."""
+    if not table.rows:
         return ""
     
-    max_cols = max(len(row) for row in table_data)
-    normalized = []
-    for row in table_data:
-        while len(row) < max_cols:
-            row.append("")
-        normalized.append(row[:max_cols])
-    
     lines = []
-    header = normalized[0]
-    lines.append("| " + " | ".join(header) + " |")
+    
+    # Título de la tabla
+    lines.append(f"### {table.title}")
+    lines.append("")
+    
+    # Calcular número máximo de columnas
+    max_cols = max(len(table.headers), max([len(row) for row in table.rows]) if table.rows else 0)
+    
+    # Normalizar headers
+    headers = table.headers + [""] * (max_cols - len(table.headers))
+    headers = headers[:max_cols]
+    
+    # Header Markdown
+    lines.append("| " + " | ".join(headers) + " |")
     lines.append("| " + " | ".join(["---"] * max_cols) + " |")
     
-    for row in normalized[1:]:
-        escaped_row = [str(cell).replace("|", "\\|") for cell in row]
-        lines.append("| " + " | ".join(escaped_row) + " |")
+    # Filas
+    for row in table.rows:
+        # Normalizar número de columnas
+        normalized_row = row + [""] * (max_cols - len(row))
+        normalized_row = normalized_row[:max_cols]
+        
+        # Escapar pipes
+        escaped = [str(cell).replace("|", "\\|") for cell in normalized_row]
+        lines.append("| " + " | ".join(escaped) + " |")
     
+    lines.append("")
     return "\n".join(lines)
+
+
+def process_document(pdf_bytes: bytes, filename: str) -> str:
+    """
+    Procesa el documento:
+    1. Extrae texto con Docling
+    2. Extrae tablas financieras con pdfplumber (reemplaza las de Docling)
+    3. Combina resultado
+    """
+    # Paso 1: Docling para texto base
+    logger.info("Extrayendo texto con Docling...")
+    doc_stream = DocumentStream(name=filename, stream=io.BytesIO(pdf_bytes))
+    result = converter.convert(doc_stream)
+    
+    # Obtener texto plano (sin tablas malformadas)
+    base_text = result.document.export_to_text()
+    
+    # Paso 2: pdfplumber para tablas financieras
+    logger.info("Extrayendo tablas financieras con pdfplumber...")
+    financial_tables = extract_financial_tables_with_pdfplumber(pdf_bytes)
+    
+    # Paso 3: Construir documento final
+    sections = []
+    
+    # Header
+    sections.append(f"# {filename.replace('.pdf', '')}")
+    sections.append("")
+    sections.append(base_text)
+    
+    # Agregar tablas financieras bien formateadas
+    if financial_tables:
+        sections.append("")
+        sections.append("---")
+        sections.append("")
+        sections.append("## 📊 Tablas Financieras Detalladas")
+        sections.append("")
+        sections.append("*Las siguientes tablas fueron extraídas con procesamiento especializado:*")
+        sections.append("")
+        
+        for table in financial_tables:
+            sections.append(format_table_to_markdown(table))
+    
+    return "\n".join(sections)
 
 
 @app.get("/health")
 def health():
-    """Endpoint de health check (compatible con docling-serve)."""
     return {
         "status": "ok",
         "service": "docling-serve-enhanced",
         "pdfplumber_available": PDFPLUMBER_AVAILABLE,
-        "features": ["ocr", "table_extraction", "financial_tables"]
+        "table_extraction": "pdfplumber-primary"
     }
 
 
 @app.get("/")
 def root():
-    """Endpoint raíz con información del servicio."""
     return {
-        "service": "Docling Serve - Mejorado para Tablas Financieras",
-        "version": "2.1.0",
-        "endpoints": {
-            "health": "/health",
-            "convert": "/v1/convert/file (POST)"
-        }
+        "service": "Docling Serve - Tablas Financieras Optimizadas",
+        "version": "2.2.0",
+        "features": ["docling-text", "pdfplumber-tables", "financial-extraction"]
     }
 
 
@@ -137,14 +228,7 @@ def convert(
     file: Optional[UploadFile] = File(None),
     files: Optional[UploadFile] = File(None)
 ):
-    """
-    Convierte un PDF a Markdown con extracción de tablas.
-    
-    Estrategia:
-    1. Usar Docling nativo (ya incluye tablas en el Markdown)
-    2. Si no hay tablas detectadas, usar pdfplumber como respaldo
-    """
-    # Aceptar file o files (OpenWebUI usa 'files')
+    """Convierte PDF a Markdown con tablas financieras optimizadas."""
     uploaded_file = file or files
     
     if not uploaded_file:
@@ -154,80 +238,39 @@ def convert(
         )
     
     try:
-        # Leer contenido del PDF
         content = uploaded_file.file.read()
         logger.info(f"Procesando: {uploaded_file.filename} ({len(content)} bytes)")
         
-        # Paso 1: Procesar con Docling nativo
-        # Docling ya extrae texto Y tablas en el Markdown
-        logger.info("Procesando con Docling nativo...")
-        doc_stream = DocumentStream(name=uploaded_file.filename, stream=io.BytesIO(content))
-        result = converter.convert(doc_stream)
+        # Procesar documento
+        markdown = process_document(content, uploaded_file.filename)
         
-        # Obtener Markdown con tablas (Docling ya incluye las tablas)
-        markdown = result.document.export_to_markdown()
+        # Contar tablas encontradas
+        table_count = markdown.count("### Tabla Financiera")
+        logger.info(f"Procesamiento completado. Tablas financieras: {table_count}")
         
-        # Contar tablas detectadas por Docling
-        docling_tables = list(result.document.tables) if hasattr(result.document, 'tables') else []
-        logger.info(f"Docling detectó {len(docling_tables)} tablas")
-        
-        # Verificar si hay tablas financieras en el contenido
-        has_financial_content = any(keyword in markdown.upper() for keyword in [
-            'PRESUPUESTO', 'TESORERIA', 'TESORERÍA', 'RECAUDACION', 
-            'INGRESO', 'EGRESO', 'TOTAL', 'BALANCE'
-        ])
-        
-        # Si hay contenido financiero pero pocas tablas, enriquecer con pdfplumber
-        pdfplumber_tables = []
-        if PDFPLUMBER_AVAILABLE and has_financial_content and len(docling_tables) < 3:
-            logger.info("Buscando tablas adicionales con pdfplumber...")
-            pdfplumber_tables = extract_tables_with_pdfplumber(content)
-            logger.info(f"pdfplumber encontró {len(pdfplumber_tables)} tablas adicionales")
-        
-        # Si pdfplumber encontró tablas que Docling no detectó, agregarlas
-        if pdfplumber_tables and len(pdfplumber_tables) > len(docling_tables):
-            logger.info("Agregando tablas de pdfplumber al documento...")
-            
-            # Agregar sección de tablas adicionales al final
-            markdown += "\n\n## 📊 Tablas Adicionales Extraídas\n\n"
-            markdown += "*Las siguientes tablas fueron procesadas con extracción especializada:*\n\n"
-            
-            for i, table in enumerate(pdfplumber_tables, 1):
-                markdown += f"### Tabla {i} (Página {table['page']})\n\n"
-                markdown += format_table_to_markdown(table['data'])
-                markdown += "\n\n"
-        
-        logger.info("Procesamiento completado exitosamente")
-        
-        # Estructura compatible con OpenWebUI
-        # OpenWebUI espera: result["document"]["md_content"]
         return JSONResponse({
             "document": {
                 "md_content": markdown,
                 "filename": uploaded_file.filename
             },
-            "text": markdown,  # Backup por si acaso
             "metadata": {
                 "filename": uploaded_file.filename,
                 "original_size": len(content),
-                "docling_tables": len(docling_tables),
-                "pdfplumber_tables": len(pdfplumber_tables),
-                "processor": "docling+pdfplumber"
+                "financial_tables": table_count,
+                "processor": "docling-text+pdfplumber-tables"
             }
         })
         
     except Exception as e:
-        logger.error(f"Error procesando archivo: {e}")
+        logger.error(f"Error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error procesando PDF: {str(e)}"
+            detail=f"Error: {str(e)}"
         )
 
 
-# Endpoint legacy para compatibilidad
 @app.post("/convert")
 def convert_legacy(file: UploadFile = File(...)):
-    """Alias legacy del endpoint de conversión."""
     return convert(file)
 
 
