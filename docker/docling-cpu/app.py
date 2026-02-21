@@ -19,8 +19,7 @@ from dataclasses import dataclass
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.responses import JSONResponse
 from docling.document_converter import DocumentConverter
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.input_doc import DocumentStream
+from docling.datamodel.base_models import InputFormat, DocumentStream
 from docling.datamodel.document import ConversionResult
 from docling.datamodel.input_doc import DocumentStream
 
