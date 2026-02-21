@@ -39,6 +39,10 @@ spec:
         - name: PIPELINES_URLS
           value: "http://pipelines-service:9099"
         
+        # Configuración de Extracción de Contenido (Docling)
+        - name: CONTENT_EXTRACTION_ENGINE
+          value: "docling"
+        
         # Configuración Vector DB (Qdrant)
         - name: VECTOR_DB
           value: "qdrant"
