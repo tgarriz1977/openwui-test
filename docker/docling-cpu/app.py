@@ -199,8 +199,14 @@ def convert(
         
         logger.info("Procesamiento completado exitosamente")
         
+        # Estructura compatible con OpenWebUI
+        # OpenWebUI espera: result["document"]["md_content"]
         return JSONResponse({
-            "text": markdown,
+            "document": {
+                "md_content": markdown,
+                "filename": uploaded_file.filename
+            },
+            "text": markdown,  # Backup por si acaso
             "metadata": {
                 "filename": uploaded_file.filename,
                 "original_size": len(content),
