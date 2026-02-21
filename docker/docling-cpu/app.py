@@ -20,6 +20,9 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.responses import JSONResponse
 from docling.document_converter import DocumentConverter
 from docling.datamodel.base_models import InputFormat
+from docling.datamodel.input_doc import DocumentStream
+from docling.datamodel.document import ConversionResult
+from docling.datamodel.input_doc import DocumentStream
 
 # Intentar importar pdfplumber (opcional pero recomendado)
 try:
@@ -307,7 +310,9 @@ def convert(
         
         # Paso 2: Procesar con Docling para texto y estructura general
         logger.info("Procesando con Docling...")
-        result = converter.convert(io.BytesIO(content))
+        # Crear DocumentStream para Docling (acepta BytesIO)
+        doc_stream = DocumentStream(name=uploaded_file.filename, stream=io.BytesIO(content))
+        result = converter.convert(doc_stream)
         original_markdown = result.document.export_to_markdown()
         
         # Paso 3: Combinar resultados si hay tablas
@@ -322,7 +327,7 @@ def convert(
         return JSONResponse({
             "text": enhanced_markdown,
             "metadata": {
-                "filename": file.filename,
+                "filename": uploaded_file.filename,
                 "original_size": len(content),
                 "tables_extracted": len(tables),
                 "financial_tables": len([t for t in tables if t.type == 'financiera']),

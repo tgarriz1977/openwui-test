@@ -17,7 +17,7 @@ spec:
 
       containers:
       - name: docling
-        image: 982170164096.dkr.ecr.us-east-2.amazonaws.com/docling-serve-enhanced:v4
+        image: 982170164096.dkr.ecr.us-east-2.amazonaws.com/docling-serve-enhanced:v5
         imagePullPolicy: Always
         ports:
         - containerPort: 5001
