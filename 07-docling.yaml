@@ -1,4 +1,3 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,8 +16,8 @@ spec:
 
       containers:
       - name: docling
-        image: 982170164096.dkr.ecr.us-east-2.amazonaws.com/docling-serve-enhanced:v12
-        imagePullPolicy: Always
+        image: quay.io/docling-project/docling-serve
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5001
           name: http
@@ -28,6 +27,7 @@ spec:
         - name: DOCLING_OCR_LANG
           value: spa,eng
         - name: DOCLING_SERVE_MAX_SYNC_WAIT
+          value: "300"
           value: "600"
         livenessProbe:
           httpGet:
@@ -63,4 +63,3 @@ spec:
   ports:
   - port: 5001
     targetPort: http
-
