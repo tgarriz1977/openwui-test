@@ -27,7 +27,6 @@ spec:
         - name: DOCLING_OCR_LANG
           value: spa,eng
         - name: DOCLING_SERVE_MAX_SYNC_WAIT
-          value: "300"
           value: "600"
         livenessProbe:
           httpGet:
