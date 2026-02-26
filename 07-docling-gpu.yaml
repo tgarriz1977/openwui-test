@@ -1,61 +1,60 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: docling
+  name: docling-gpu
+  namespace: rag-system
 spec:
-  replicas: 1
+  replicas: 0
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
-      app: docling
+      app: docling-gpu
   template:
     metadata:
       labels:
-        app: docling
+        app: docling      # mismo label que usa el Service docling
+        variant: gpu
     spec:
       runtimeClassName: nvidia
-      imagePullSecrets:
-      - name: harbor-secret
       nodeSelector:
-        kubernetes.io/hostname: infra-ia02
+        node-type: gpu
       tolerations:
       - key: role
         operator: Equal
         value: gpu
         effect: NoSchedule
-      securityContext:
-        runAsUser: 0
       containers:
       - name: docling
-        image: registry.arba.gov.ar/infraestructura/docling-serve-cu126:latest  
-        imagePullPolicy: Always        
+        image: 982170164096.dkr.ecr.us-east-2.amazonaws.com/docling-serve-gpu:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5001
           name: http
         env:
-        - name: DOCLING_ROCR_VERBOSE
-          value: "1"
         - name: DOCLING_OCR_ENGINE
-          value: rapidocr
+          value: rapidocr          # GPU-accelerated via onnxruntime-gpu
         - name: DOCLING_OCR_LANG
           value: spa,eng
         - name: DOCLING_SERVE_ENABLE_CUDA
           value: "1"
         - name: NVIDIA_DRIVER_CAPABILITIES
           value: all
+        - name: DOCLING_SERVE_MAX_SYNC_WAIT
+          value: "600"
         resources:
           requests:
-            cpu: 250m
+            cpu: 500m
             memory: 2Gi
             nvidia.com/gpu: 1
           limits:
             cpu: "2"
-            memory: 4Gi
+            memory: 6Gi
             nvidia.com/gpu: 1
         livenessProbe:
           httpGet:
             path: /health
             port: http
-          initialDelaySeconds: 20
+          initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
@@ -63,7 +62,7 @@ spec:
           httpGet:
             path: /health
             port: http
-          initialDelaySeconds: 10
+          initialDelaySeconds: 15
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
@@ -72,6 +71,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: docling
+  namespace: rag-system
 spec:
   selector:
     app: docling
