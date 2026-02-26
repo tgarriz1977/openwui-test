@@ -8,11 +8,12 @@ spec:
   revisionHistoryLimit: 2
   selector:
     matchLabels:
-      app: docling-gpu
+      app: docling
+      variant: gpu
   template:
     metadata:
       labels:
-        app: docling      # mismo label que usa el Service docling
+        app: docling
         variant: gpu
     spec:
       runtimeClassName: nvidia
