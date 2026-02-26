@@ -1,0 +1,38 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: colegio-staging
+  region: us-east-2
+
+vpc:
+  id: vpc-0d9eef5130a1183c4
+  securityGroup: sg-0a7a1a68750e19d94
+  subnets:
+    private:
+      us-east-2a:
+        id: subnet-07eb08786cd8c2193
+      us-east-2b:
+        id: subnet-058a979f280bcdaaa
+
+managedNodeGroups:
+  - name: gpu-spot
+    instanceType: g4dn.xlarge
+    spot: true
+    minSize: 0
+    maxSize: 1
+    desiredCapacity: 0
+    amiFamily: AmazonLinux2023
+    privateNetworking: true
+    subnets:
+      - subnet-07eb08786cd8c2193
+      - subnet-058a979f280bcdaaa
+    labels:
+      node-type: gpu
+    taints:
+      - key: role
+        value: gpu
+        effect: NoSchedule
+    iam:
+      withAddonPolicies:
+        autoScaler: true
