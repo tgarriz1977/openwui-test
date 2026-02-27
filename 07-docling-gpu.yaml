@@ -4,7 +4,7 @@ metadata:
   name: docling-gpu
   namespace: rag-system
 spec:
-  replicas: 0
+  replicas: 1
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -16,13 +16,11 @@ spec:
         app: docling
         variant: gpu
     spec:
-      runtimeClassName: nvidia
       nodeSelector:
         node-type: gpu
       tolerations:
-      - key: role
-        operator: Equal
-        value: gpu
+      - key: nvidia.com/gpu
+        operator: Exists
         effect: NoSchedule
       containers:
       - name: docling

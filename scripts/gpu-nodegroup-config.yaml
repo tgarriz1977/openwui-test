@@ -30,8 +30,7 @@ managedNodeGroups:
     labels:
       node-type: gpu
     taints:
-      - key: role
-        value: gpu
+      - key: nvidia.com/gpu
         effect: NoSchedule
     iam:
       withAddonPolicies:

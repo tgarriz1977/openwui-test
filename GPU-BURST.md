@@ -57,7 +57,7 @@ eksctl create nodegroup \
   --nodes 0 \
   --spot \
   --node-labels "node-type=gpu" \
-  --node-taints "role=gpu:NoSchedule" \
+  --node-taints "nvidia.com/gpu:NoSchedule" \
   --asg-access \
   --managed
 ```

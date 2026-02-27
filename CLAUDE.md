@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # RAG System - OpenWebUI on EKS
 
 ## Proyecto
@@ -48,7 +52,8 @@ OpenWebUI (:8080) ──► Bedrock Gateway (:80) ──► AWS Bedrock (LLM / E
 | `02-qdrant.yaml` | Deployment + Service de Qdrant |
 | `03-secrets.yaml` | Secret `openwebui-secret` (WEBUI_SECRET_KEY) |
 | `04-openwebui.yaml` | Deployment + Service + Ingress (TLS) de OpenWebUI |
-| `07-docling-gpu.yaml` | Deployment (`replicas:0`) + Service de Docling GPU |
+| `07-docling-gpu.yaml` | Deployment (`replicas:0`) de Docling GPU — **NO incluido en kustomization.yaml**, se aplica manualmente via `gpu-burst-start.sh` |
+| `07-docling-service.yaml` | Service de Docling (siempre activo, rutea al pod GPU cuando existe) |
 | `09-postgresql.yaml` | PVC + Secret + StatefulSet + ConfigMap init + Services de PostgreSQL |
 | `bedrock-gw/bedrock-gateway-secret.yaml` | Secret con API key del Bedrock Gateway |
 | `bedrock-gw/bedrock-gateway-deployment.yaml` | Deployment + Service del Bedrock Gateway |
