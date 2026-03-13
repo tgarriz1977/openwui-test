@@ -19,9 +19,9 @@ spec:
       nodeSelector:
         node-type: gpu
       tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
+      - key: "role"
+        value: "gpu"
+        effect: "NoSchedule"
       containers:
       - name: docling
         image: 982170164096.dkr.ecr.us-east-2.amazonaws.com/docling-serve-gpu:latest
