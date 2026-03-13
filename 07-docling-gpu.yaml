@@ -31,7 +31,7 @@ spec:
           name: http
         env:
         - name: DOCLING_OCR_ENGINE
-          value: rapidocr          # GPU-accelerated via onnxruntime-gpu
+          value: easyocr           # mejor soporte español (á,é,í,ó,ú,ñ) + CUDA nativo
         - name: DOCLING_OCR_LANG
           value: spa,eng
         - name: DOCLING_SERVE_ENABLE_CUDA
