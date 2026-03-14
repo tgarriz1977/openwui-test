@@ -9,7 +9,7 @@ resources:
   - 03-secrets.yaml
   - 04-openwebui.yaml
   - 07-docling-service.yaml
-  - 07-docling-gpu.yaml
+#  - 07-docling-gpu.yaml queda afuera para solo editar y pasar replicas a 0 o 1
   - 09-postgresql.yaml
   - bedrock-gw/bedrock-gateway-secret.yaml
   - bedrock-gw/bedrock-gateway-deployment.yaml
