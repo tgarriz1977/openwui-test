@@ -6,7 +6,7 @@ metadata:
   labels:
     app: open-webui
 spec:
-  replicas: 0
+  replicas: 1
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -70,10 +70,10 @@ spec:
         resources:
           requests:
             memory: "500Mi"
-            cpu: "250m"
+            cpu: "100m"
           limits:
             memory: "1Gi"
-            cpu: "1"
+            cpu: "800m"
         volumeMounts:
         - name: storage
           mountPath: /app/backend/data
