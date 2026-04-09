@@ -15,4 +15,5 @@ RUN dnf config-manager --add-repo \
 RUN pip uninstall -y onnxruntime && \
     pip install --no-cache-dir onnxruntime-gpu
 
+
 USER 1001
