@@ -18,27 +18,42 @@ echo "Cluster: ${CLUSTER} | Node group: ${NODEGROUP}"
 echo "================================================"
 echo ""
 
+echo "▶ Verificando que el node group '${NODEGROUP}' exista..."
+if ! aws eks describe-nodegroup \
+      --cluster-name "${CLUSTER}" \
+      --region "${REGION}" \
+      --nodegroup-name "${NODEGROUP}" >/dev/null 2>&1; then
+    echo "❌ El node group '${NODEGROUP}' no existe en el cluster '${CLUSTER}'."
+    echo "   Corré primero ./scripts/setup-gpu-nodegroup.sh"
+    exit 1
+fi
+
 echo "▶ Escalando node group GPU a 1 instancia..."
 aws eks update-nodegroup-config \
   --cluster-name "${CLUSTER}" \
   --region "${REGION}" \
   --nodegroup-name "${NODEGROUP}" \
-  --scaling-config minSize=0,maxSize=1,desiredSize=1
+  --scaling-config minSize=0,maxSize=1,desiredSize=1 >/dev/null
 
 echo "⏳ Esperando que el nodo GPU esté Ready (puede tardar 3-5 min)..."
-# Esperar a que aparezca al menos un nodo con el label
+NODE_READY=0
 for i in $(seq 1 30); do
-    NODE_COUNT=$(kubectl get nodes -l node-type=gpu --no-headers 2>/dev/null | grep -c Ready || true)
+    NODE_COUNT=$(kubectl get nodes -l node-type=gpu --no-headers 2>/dev/null \
+                 | awk '$2=="Ready"' | wc -l)
     if [ "${NODE_COUNT}" -ge 1 ]; then
         echo "Nodo GPU Ready."
+        NODE_READY=1
         break
     fi
     echo "  Intento ${i}/30 — esperando nodo..."
     sleep 20
 done
 
-kubectl wait node -l node-type=gpu \
-  --for=condition=Ready --timeout=60s
+if [ "${NODE_READY}" -ne 1 ]; then
+    echo "❌ Timeout esperando el nodo GPU (10 min). Posible falta de capacity spot."
+    echo "   Revisá: aws eks describe-nodegroup --cluster-name ${CLUSTER} --nodegroup-name ${NODEGROUP} --region ${REGION}"
+    exit 1
+fi
 
 echo ""
 echo "▶ Levantando Docling GPU (replicas=1)..."
