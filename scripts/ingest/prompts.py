@@ -25,7 +25,7 @@ Para cada nota extraé:
 - resolucion (string o null): texto de la resolución si existe
 - personas (array): cada persona mencionada con:
   - nombre_completo (string)
-  - numero_matricula (string o null): formato T-XXXXX o T3-XXXXX
+  - numero_matricula (string o null): número COMPLETO con punto y todos los dígitos, ej T-43.822 o T3-48.508 o RIE-1-49.220, NUNCA truncar
   - rol_mencion (string): "solicitante", "involucrado", o "cancelacion"
 - expedientes (array): cada expediente mencionado con:
   - numero_expediente (string)
@@ -74,12 +74,12 @@ Para cada nota extraé:
 - fecha_nota (string YYYY-MM-DD o null)
 - descripcion (string): texto completo
 - resolucion (string o null)
-- personas (array): cada persona con nombre_completo, numero_matricula, rol_mencion
+- personas (array): cada persona con nombre_completo (string), numero_matricula (string COMPLETO con punto y todos los dígitos ej T-43.822, NUNCA truncar), rol_mencion (string)
 - expedientes (array): expedientes mencionados
 - resoluciones_distritales (array): cada resolución distrital mencionada con:
   - numero_resolucion (string): ej "RES.DIIN°1.708/24"
   - tecnico (string): nombre del técnico
-  - matricula (string): número de matrícula
+  - matricula (string): número COMPLETO con punto y todos los dígitos, ej T-51.899, NUNCA truncar
   - tipo_resolucion (string): "Cancelacion", "Rehabilitacion", u otro
   - distrito (string): distrito al que pertenece
 
@@ -110,6 +110,115 @@ Devolvé ÚNICAMENTE este JSON, sin nada más:
     }
   ]
 }
+
+CONTENIDO DEL ACTA:
+{markdown}
+"""
+
+PROMPT_DISTRITOS = """
+Sos un extractor de datos estructurados especializado en actas del Colegio de Técnicos de la Provincia de Buenos Aires.
+
+Extraé ÚNICAMENTE las notas de los DISTRITOS (DISTRITO I al DISTRITO VII) del acta en formato Markdown que se te provee.
+
+Para cada nota extraé:
+- codigo_nota (string): código de la nota, ej "SD 3.588/24"
+- seccion (string): nombre del distrito, ej "Distrito I"
+- tema (string)
+- fecha_nota (string YYYY-MM-DD o null)
+- descripcion (string)
+- resolucion (string o null)
+- personas (array): cada persona con nombre_completo (string), numero_matricula (string COMPLETO con punto y todos los dígitos ej T-43.822, NUNCA truncar), rol_mencion (string)
+- expedientes (array): cada expediente con numero_expediente, referencia_ctd
+- resoluciones_distritales (array): cada resolución con numero_resolucion (string), tecnico (string), matricula (string COMPLETA con punto y todos los dígitos ej T-51.899), tipo_resolucion (string), distrito (string)
+
+Devolvé ÚNICAMENTE este JSON sin nada más:
+{"notas_distritos": [...]}
+
+CONTENIDO DEL ACTA:
+{markdown}
+"""
+
+PROMPT_AS_AT = """
+Sos un extractor de datos estructurados especializado en actas del Colegio de Técnicos de la Provincia de Buenos Aires.
+
+Extraé ÚNICAMENTE las NOTAS AS y NOTAS AT del acta en formato Markdown que se te provee.
+
+Para cada nota extraé:
+- codigo_nota (string): ej "AS 17.362/24" o "AT 01/24"
+- seccion (string): "AS" o "AT"
+- tema (string)
+- fecha_nota (string YYYY-MM-DD o null)
+- descripcion (string)
+- resolucion (string o null)
+- personas (array): cada persona con nombre_completo (string), numero_matricula (string COMPLETO con punto y todos los dígitos ej T-43.822, NUNCA truncar), rol_mencion (string)
+- expedientes (array): cada expediente con numero_expediente, referencia_ctd
+
+Devolvé ÚNICAMENTE este JSON sin nada más:
+{"notas_as": [...], "notas_at": [...]}
+
+CONTENIDO DEL ACTA:
+{markdown}
+"""
+
+PROMPT_TEMAS_VARIOS = """
+Sos un extractor de datos estructurados especializado en actas del Colegio de Técnicos de la Provincia de Buenos Aires.
+
+Extraé ÚNICAMENTE los TEMAS VARIOS del acta en formato Markdown que se te provee.
+
+Para cada punto extraé:
+- numero_punto (integer)
+- titulo (string)
+- descripcion (string)
+- resolucion (string o null)
+
+Devolvé ÚNICAMENTE este JSON sin nada más:
+{"temas_varios": [...]}
+
+CONTENIDO DEL ACTA:
+{markdown}
+"""
+
+PROMPT_DISTRITOS_1_4 = """
+Sos un extractor de datos estructurados especializado en actas del Colegio de Técnicos de la Provincia de Buenos Aires.
+
+Extraé ÚNICAMENTE las notas de DISTRITO I, DISTRITO II, DISTRITO III y DISTRITO IV del acta en formato Markdown que se te provee. Ignorá el resto.
+
+Para cada nota extraé:
+- codigo_nota (string): código de la nota, ej "SD 3.588/24"
+- seccion (string): nombre del distrito, ej "Distrito I"
+- tema (string)
+- fecha_nota (string YYYY-MM-DD o null)
+- descripcion (string)
+- resolucion (string o null)
+- personas (array): cada persona con nombre_completo (string), numero_matricula (string COMPLETO con punto y todos los dígitos ej T-43.822, NUNCA truncar), rol_mencion (string)
+- expedientes (array): cada expediente con numero_expediente, referencia_ctd
+- resoluciones_distritales (array): cada resolución con numero_resolucion (string), tecnico (string), matricula (string COMPLETA con punto y todos los dígitos ej T-51.899), tipo_resolucion (string), distrito (string)
+
+Devolvé ÚNICAMENTE este JSON sin nada más:
+{"notas_distritos": [...]}
+
+CONTENIDO DEL ACTA:
+{markdown}
+"""
+
+PROMPT_DISTRITOS_5_7 = """
+Sos un extractor de datos estructurados especializado en actas del Colegio de Técnicos de la Provincia de Buenos Aires.
+
+Extraé ÚNICAMENTE las notas de DISTRITO V, DISTRITO VI y DISTRITO VII del acta en formato Markdown que se te provee. Ignorá el resto.
+
+Para cada nota extraé:
+- codigo_nota (string): código de la nota, ej "SD 4.627/24"
+- seccion (string): nombre del distrito, ej "Distrito VI"
+- tema (string)
+- fecha_nota (string YYYY-MM-DD o null)
+- descripcion (string)
+- resolucion (string o null)
+- personas (array): cada persona con nombre_completo (string), numero_matricula (string COMPLETO con punto y todos los dígitos ej T-43.822, NUNCA truncar), rol_mencion (string)
+- expedientes (array): cada expediente con numero_expediente, referencia_ctd
+- resoluciones_distritales (array): cada resolución con numero_resolucion (string), tecnico (string), matricula (string COMPLETA con punto y todos los dígitos ej T-51.899), tipo_resolucion (string), distrito (string)
+
+Devolvé ÚNICAMENTE este JSON sin nada más:
+{"notas_distritos": [...]}
 
 CONTENIDO DEL ACTA:
 {markdown}
