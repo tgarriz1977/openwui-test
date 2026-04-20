@@ -73,3 +73,53 @@ spec:
       # 3. Volumen temporal para compartir las librerías entre contenedores
       - name: python-libs
         emptyDir: {}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: rag-system
+  name: pipelines-storage
+  namespace: rag-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: gp3-delete
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pipelines
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: rag-system
+  name: pipelines-service
+  namespace: rag-system
+spec:
+  ports:
+    - name: http
+      port: 9099
+      protocol: TCP
+      targetPort: 9099
+  selector:
+    app: pipelines
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: rag-system
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: rag-system
+  name: pipelines-secret
+  namespace: rag-system
+type: Opaque
+data:
+  api-key: MHAzbi13M2J1IQ==
