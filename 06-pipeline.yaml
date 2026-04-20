@@ -3,37 +3,42 @@ kind: Deployment
 metadata:
   labels:
     app: pipelines
-    app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/part-of: rag-system
   name: pipelines
   namespace: rag-system
 spec:
   replicas: 1
-  revisionHistoryLimit: 3
-  selector:
-    matchLabels:
-      app: pipelines
-      app.kubernetes.io/managed-by: kustomize
-      app.kubernetes.io/part-of: rag-system
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
         app: pipelines
-        app.kubernetes.io/managed-by: kustomize
-        app.kubernetes.io/part-of: rag-system
     spec:
+      # 1. El Init Container corre como ROOT para poder instalar sin problemas
+      initContainers:
+      - name: install-deps
+        image: python:3.11-slim
+        command:
+        - sh
+        - -c
+        - |
+          pip install --target=/pip_libs psycopg2-binary qdrant-client openai pydantic
+        volumeMounts:
+        - mountPath: /pip_libs
+          name: python-libs
       containers:
-      - env:
+      - name: pipelines
+        image: ghcr.io/open-webui/pipelines:main
+        env:
+        # 2. LE DECIMOS A PYTHON DONDE ESTÁN LAS LIBRERÍAS NUEVAS
+        - name: PYTHONPATH
+          value: "/pip_libs"
         - name: PIPELINES_API_KEY
           valueFrom:
             secretKeyRef:
               key: api-key
               name: pipelines-secret
-        - name: PIPELINES_URLS
-        - name: LOG_LEVEL
-          value: INFO
         - name: DATABASE_URL
           value: "postgresql://ragsystemuser:admin123@postgres:5432/colegio_tecnicos"
         - name: BEDROCK_URL
@@ -49,105 +54,22 @@ spec:
           value: "http://qdrant-service.rag-system.svc.cluster.local:6333"
         - name: QDRANT_COLLECTION
           value: "actas_colegio"
-        image: ghcr.io/open-webui/pipelines:main
-        imagePullPolicy: Always
-        livenessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /
-            port: http
-            scheme: HTTP
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 5
-        name: pipelines
         ports:
         - containerPort: 9099
           name: http
-          protocol: TCP
-        readinessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /
-            port: http
-            scheme: HTTP
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          successThreshold: 1
-          timeoutSeconds: 3
-        resources:
-          limits:
-            cpu: "1"
-            memory: 1Gi
-          requests:
-            cpu: 250m
-            memory: 512Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsGroup: 1000
-          runAsNonRoot: true
-          runAsUser: 1000
         volumeMounts:
         - mountPath: /app/pipelines
           name: pipelines-data
-      restartPolicy: Always
-      securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsUser: 1000
-      terminationGracePeriodSeconds: 30
+        - mountPath: /pip_libs
+          name: python-libs
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          runAsNonRoot: true
       volumes:
       - name: pipelines-data
         persistentVolumeClaim:
           claimName: pipelines-storage
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/part-of: rag-system
-  name: pipelines-storage
-  namespace: rag-system
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-  storageClassName: gp3-delete
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: pipelines
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/part-of: rag-system
-  name: pipelines-service
-  namespace: rag-system
-spec:
-  ports:
-  - name: http
-    port: 9099
-    protocol: TCP
-    targetPort: 9099
-  selector:
-    app: pipelines
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/part-of: rag-system
-  sessionAffinity: None
-  type: ClusterIP
----
-apiVersion: v1
-data:
-  api-key: MHAzbi13M2J1IQ==
-kind: Secret
-metadata:
-  labels:
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/part-of: rag-system
-  name: pipelines-secret
-  namespace: rag-system
-type: Opaque
+      # 3. Volumen temporal para compartir las librerías entre contenedores
+      - name: python-libs
+        emptyDir: {}
