@@ -14,9 +14,10 @@ def insertar_acta(conn, acta: dict) -> int:
     """Inserta el acta y devuelve su id. Si ya existe, devuelve el id existente."""
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO actas (acta_numero, fecha, participantes, hora_inicio, hora_fin, total_paginas)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO actas (acta_numero, tipo, fecha, participantes, hora_inicio, hora_fin, total_paginas)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (acta_numero) DO UPDATE SET
+                tipo = EXCLUDED.tipo,
                 fecha = EXCLUDED.fecha,
                 participantes = EXCLUDED.participantes,
                 hora_inicio = EXCLUDED.hora_inicio,
@@ -25,6 +26,7 @@ def insertar_acta(conn, acta: dict) -> int:
             RETURNING id
         """, (
             acta["acta_numero"],
+            acta.get("tipo", "Mesa Ejecutiva"),
             acta.get("fecha"),
             acta.get("participantes", []),
             acta.get("hora_inicio"),
@@ -56,28 +58,34 @@ def insertar_nota(conn, nota: dict, acta_id: int, seccion_override: str = None) 
     # Inserta personas mencionadas
     personas = nota.get("personas", [])
     if personas:
+        rows = []
+        for p in personas:
+            if isinstance(p, str):
+                rows.append((nota_id, p, None, None))
+            else:
+                rows.append((nota_id, p.get("nombre_completo"), p.get("numero_matricula"), p.get("rol_mencion")))
         with conn.cursor() as cur:
             execute_values(cur, """
-                INSERT INTO personas_mencionadas 
+                INSERT INTO personas_mencionadas
                     (nota_id, nombre_completo, numero_matricula, rol_mencion)
                 VALUES %s
-            """, [
-                (nota_id, p.get("nombre_completo"), p.get("numero_matricula"), p.get("rol_mencion"))
-                for p in personas
-            ])
+            """, rows)
     
     # Inserta expedientes mencionados
     expedientes = nota.get("expedientes", [])
     if expedientes:
+        rows = []
+        for e in expedientes:
+            if isinstance(e, str):
+                rows.append((nota_id, e, None))
+            else:
+                rows.append((nota_id, e.get("numero_expediente"), e.get("referencia_ctd")))
         with conn.cursor() as cur:
             execute_values(cur, """
-                INSERT INTO expedientes_mencionados 
+                INSERT INTO expedientes_mencionados
                     (nota_id, numero_expediente, referencia_ctd)
                 VALUES %s
-            """, [
-                (nota_id, e.get("numero_expediente"), e.get("referencia_ctd"))
-                for e in expedientes
-            ])
+            """, rows)
     
     # Inserta resoluciones distritales
     resoluciones = nota.get("resoluciones_distritales", [])

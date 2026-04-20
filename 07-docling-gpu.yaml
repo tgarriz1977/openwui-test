@@ -17,12 +17,14 @@ spec:
       labels:
         app: docling
         variant: gpu
+        app.kubernetes.io/part-of: rag-system
+        app.kubernetes.io/managed-by: kustomize
     spec:
       nodeSelector:
         node-type: gpu
       tolerations:
-      - key: "role"
-        value: "gpu"
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
         effect: "NoSchedule"
       containers:
       - name: docling

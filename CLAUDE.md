@@ -108,6 +108,36 @@ cd docker/docling-gpu && ./build-and-push.sh
 ./scripts/gpu-burst-stop.sh    # baja docling + termina nodo ($0)
 ```
 
+### Nodegroups GPU disponibles
+
+Existen **dos managed nodegroups** intercambiables para GPU, ambos con label `node-type=gpu` y taint `nvidia.com/gpu:NoSchedule` (compatible con el NVIDIA device plugin). El deploy `docling-gpu` schedulea indistintamente en cualquiera:
+
+| Nodegroup | Tipo | Instance | Costo | Cuándo usarlo |
+|---|---|---|---|---|
+| `gpu-spot` | SPOT | g4dn.xlarge | ~$0.17/hr | Default — OCR rutinario |
+| `gpu-ondemand` | ON_DEMAND | g4dn.xlarge | ~$0.53/hr | Fallback cuando spot sufre `UnfulfillableCapacity` o reclaims continuos |
+
+Ambos están limitados a subnets de `us-east-2a` y `us-east-2b`. Configs en [scripts/gpu-nodegroup-config.yaml](scripts/gpu-nodegroup-config.yaml) y [scripts/gpu-ondemand-nodegroup-config.yaml](scripts/gpu-ondemand-nodegroup-config.yaml).
+
+**Alternar entre spot y on-demand** (en vez de recrear):
+```bash
+# Pasar a on-demand
+aws eks update-nodegroup-config --cluster-name colegio-staging --region us-east-2 \
+  --nodegroup-name gpu-spot     --scaling-config minSize=0,maxSize=1,desiredSize=0
+aws eks update-nodegroup-config --cluster-name colegio-staging --region us-east-2 \
+  --nodegroup-name gpu-ondemand --scaling-config minSize=0,maxSize=1,desiredSize=1
+
+# Volver a spot
+aws eks update-nodegroup-config --cluster-name colegio-staging --region us-east-2 \
+  --nodegroup-name gpu-ondemand --scaling-config minSize=0,maxSize=1,desiredSize=0
+aws eks update-nodegroup-config --cluster-name colegio-staging --region us-east-2 \
+  --nodegroup-name gpu-spot     --scaling-config minSize=0,maxSize=1,desiredSize=1
+```
+
+> Mantener **solo uno activo** a la vez para no pagar doble nodo.
+
+> `scripts/gpu-burst-start.sh` y `gpu-burst-stop.sh` solo manipulan `gpu-spot`. Si estás usando `gpu-ondemand`, escalá manualmente con los comandos de arriba.
+
 ## Despliegue y GitOps
 
 ArgoCD monitorea `main` y aplica cambios automáticamente. Para emergencias:
