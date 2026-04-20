@@ -19,6 +19,8 @@ spec:
       initContainers:
       - name: install-deps
         image: python:3.11-slim
+        securityContext:
+          runAsUser: 0
         command:
         - sh
         - -c
