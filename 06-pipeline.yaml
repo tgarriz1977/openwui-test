@@ -34,6 +34,21 @@ spec:
         - name: PIPELINES_URLS
         - name: LOG_LEVEL
           value: INFO
+        - name: DATABASE_URL
+          value: "postgresql://ragsystemuser:admin123@postgres:5432/colegio_tecnicos"
+        - name: BEDROCK_URL
+          value: "http://bedrock-gateway.rag-system.svc.cluster.local:80"
+        - name: BEDROCK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bedrock-gateway-secret
+              key: api-key
+        - name: BEDROCK_MODEL
+          value: "us.anthropic.claude-sonnet-4-20250514-v1:0"
+        - name: QDRANT_URL
+          value: "http://qdrant-service.rag-system.svc.cluster.local:6333"
+        - name: QDRANT_COLLECTION
+          value: "actas_colegio"
         image: ghcr.io/open-webui/pipelines:main
         imagePullPolicy: Always
         livenessProbe:
@@ -76,8 +91,6 @@ spec:
         volumeMounts:
         - mountPath: /app/pipelines
           name: pipelines-data
-      imagePullSecrets:
-      - name: harbor-secret
       restartPolicy: Always
       securityContext:
         fsGroup: 1000
@@ -103,7 +116,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: longhorn
+  storageClassName: gp3-delete
 ---
 apiVersion: v1
 kind: Service

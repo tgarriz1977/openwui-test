@@ -8,6 +8,7 @@ resources:
   - 02-qdrant.yaml
   - 03-secrets.yaml
   - 04-openwebui.yaml
+  - 06-pipeline.yaml
   - 07-docling-service.yaml
 #  - 07-docling-gpu.yaml queda afuera para solo editar y pasar replicas a 0 o 1
   - 09-postgresql.yaml
