@@ -456,13 +456,20 @@ class Pipeline:
             conn.close()
 
         if not rows:
-            return ""
-        lineas = ["\n\n---\n> 📎 **Fuentes**"]
-        for r in rows:
+            return [], ""
+        sources = []
+        markers = []
+        for i, r in enumerate(rows, 1):
             tipo_abrev = "ME" if "Ejecutiva" in (r["tipo"] or "") else "CS"
             fecha = str(r["fecha"]) if r["fecha"] else ""
-            lineas.append(f"> [Acta {tipo_abrev} N° {r['acta_numero']} ({fecha})]({r['pdf_url']})")
-        return "\n".join(lineas)
+            nombre = f"Acta {tipo_abrev} N° {r['acta_numero']} ({fecha})"
+            sources.append({
+                "source": {"name": nombre},
+                "document": [""],
+                "metadata": [{"source": r["pdf_url"], "name": nombre}],
+            })
+            markers.append(f"[{i}]")
+        return sources, " ".join(markers)
 
     async def outlet(self, body: dict, user: Optional[dict] = None) -> dict:
         if not self.valves.enabled:
@@ -473,18 +480,14 @@ class Pipeline:
             if not numeros:
                 return body
 
-            msgs = body.get("messages", [])
-            last_assistant = next((m for m in reversed(msgs) if m.get("role") == "assistant"), None)
-            if not last_assistant:
-                return body
-            content = last_assistant.get("content")
-            if not isinstance(content, str):
-                return body
-
-            fuentes = self._fuentes(numeros)
-            if fuentes:
-                last_assistant["content"] = content + fuentes
-                print(f"[query_router] fuentes agregadas — actas={numeros}")
+            sources, markers = self._fuentes(numeros)
+            if sources:
+                msgs = body.get("messages", [])
+                last_assistant = next((m for m in reversed(msgs) if m.get("role") == "assistant"), None)
+                if last_assistant and isinstance(last_assistant.get("content"), str):
+                    last_assistant["sources"] = sources
+                    last_assistant["content"] += f"\n\n{markers}"
+                    print(f"[query_router] fuentes inyectadas — actas={numeros}")
         except Exception as e:
             print(f"[query_router] outlet ERROR: {e}")
         return body
