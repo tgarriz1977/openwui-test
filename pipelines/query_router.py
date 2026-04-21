@@ -108,6 +108,7 @@ class Pipeline:
         self.llm: Optional[OpenAI] = None
         self.model: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"
         self.embedding_model: str = "amazon.titan-embed-text-v2:0"
+        self._pending_actas: List[int] = []
 
     async def on_startup(self):
         self.pg_dsn = os.environ["DATABASE_URL"]
@@ -420,6 +421,13 @@ class Pipeline:
                 print(
                     f"[query_router] contexto inyectado — pg={len(pg_rows)} qdrant={len(qd_hits)}"
                 )
+
+            # guardar actas recuperadas para el outlet
+            self._pending_actas = sorted({
+                r["acta_numero"] for r in pg_rows if r.get("acta_numero")
+            } | {
+                h["acta_numero"] for h in qd_hits if h.get("acta_numero")
+            })
         except Exception as e:
             print(f"[query_router] ERROR: {e}")
         return body
@@ -458,19 +466,17 @@ class Pipeline:
         if not self.valves.enabled:
             return body
         try:
+            numeros = self._pending_actas
+            self._pending_actas = []
+            if not numeros:
+                return body
+
             msgs = body.get("messages", [])
             last_assistant = next((m for m in reversed(msgs) if m.get("role") == "assistant"), None)
             if not last_assistant:
                 return body
             content = last_assistant.get("content")
             if not isinstance(content, str):
-                return body
-
-            numeros = sorted({
-                int(n)
-                for n in re.findall(r"[Aa]cta[s]?\s+(?:[Nn][°o]?\s*)?(\d{3,4})", content)
-            })
-            if not numeros:
                 return body
 
             fuentes = self._fuentes(numeros)
