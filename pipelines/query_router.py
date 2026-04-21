@@ -161,21 +161,57 @@ class Pipeline:
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 if nombre and not matricula:
+                    tokens = [t for t in nombre.replace(",", " ").split() if len(t) > 1]
+                    cond_pm = " AND ".join("p.nombre_completo ILIKE %s" for _ in tokens)
+                    params_pm = [f"%{t}%" for t in tokens]
                     cur.execute(
-                        """
+                        f"""
                         SELECT a.acta_numero, a.tipo, a.fecha, n.seccion, n.codigo_nota,
                                n.tema, n.descripcion, n.resolucion,
                                p.nombre_completo, p.numero_matricula, p.rol_mencion
                         FROM personas_mencionadas p
                         JOIN notas_ingresadas n ON n.id = p.nota_id
                         JOIN actas a ON a.id = n.acta_id
-                        WHERE p.nombre_completo ILIKE %s
+                        WHERE {cond_pm}
                         ORDER BY a.fecha DESC NULLS LAST
                         LIMIT %s
                         """,
-                        (f"%{nombre}%", self.valves.max_rows_pg),
+                        params_pm + [self.valves.max_rows_pg],
                     )
-                    return [dict(r) for r in cur.fetchall()]
+                    rows = [dict(r) for r in cur.fetchall()]
+
+                    # también buscar en participantes de mesa (array en actas)
+                    cond_ac = " AND ".join(
+                        "EXISTS (SELECT 1 FROM unnest(a.participantes) px WHERE px ILIKE %s)"
+                        for _ in tokens
+                    )
+                    # subquery para extraer el nombre del participante que matchea todos los tokens
+                    cond_nombre = " AND ".join(f"px ILIKE %s" for _ in tokens)
+                    params_ac = [f"%{t}%" for t in tokens]
+                    cur.execute(
+                        f"""
+                        SELECT a.acta_numero, a.tipo, a.fecha,
+                               NULL::text AS seccion, NULL::text AS codigo_nota,
+                               NULL::text AS tema, NULL::text AS descripcion,
+                               NULL::text AS resolucion,
+                               (SELECT px FROM unnest(a.participantes) px
+                                WHERE {cond_nombre} LIMIT 1) AS nombre_completo,
+                               NULL::text AS numero_matricula,
+                               'participante' AS rol_mencion
+                        FROM actas a
+                        WHERE {cond_ac}
+                        ORDER BY a.fecha DESC NULLS LAST
+                        LIMIT %s
+                        """,
+                        params_ac + params_ac + [self.valves.max_rows_pg],
+                    )
+                    participaciones = [dict(r) for r in cur.fetchall()]
+
+                    # deduplicar actas ya cubiertas por personas_mencionadas
+                    actas_en_notas = {r["acta_numero"] for r in rows}
+                    participaciones = [r for r in participaciones if r["acta_numero"] not in actas_en_notas]
+
+                    return rows + participaciones
 
                 if matricula:
                     cur.execute(
