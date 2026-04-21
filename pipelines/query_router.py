@@ -457,12 +457,12 @@ class Pipeline:
 
         if not rows:
             return ""
-        links = []
+        lineas = ["\n\n---\n> 📎 **Fuentes**"]
         for r in rows:
             tipo_abrev = "ME" if "Ejecutiva" in (r["tipo"] or "") else "CS"
             fecha = str(r["fecha"]) if r["fecha"] else ""
-            links.append(f"[Acta {tipo_abrev} N° {r['acta_numero']} ({fecha})]({r['pdf_url']})")
-        return "\n\n---\n##### 📎 Fuentes\n" + " · ".join(links)
+            lineas.append(f"> [Acta {tipo_abrev} N° {r['acta_numero']} ({fecha})]({r['pdf_url']})")
+        return "\n".join(lineas)
 
     async def outlet(self, body: dict, user: Optional[dict] = None) -> dict:
         if not self.valves.enabled:
