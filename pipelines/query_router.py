@@ -332,9 +332,9 @@ class Pipeline:
 
     def _semantico(self, query: str, filtros: dict) -> list:
         vector = self._embedding(query)
-        hits = self.qdrant.search(
+        result = self.qdrant.query_points(
             collection_name=self.collection,
-            query_vector=vector,
+            query=vector,
             query_filter=self._qdrant_filter(filtros),
             limit=self.valves.top_k_qdrant,
             with_payload=True,
@@ -349,7 +349,7 @@ class Pipeline:
                 "tema": h.payload.get("tema"),
                 "texto": h.payload.get("texto_completo"),
             }
-            for h in hits
+            for h in result.points
         ]
 
     def _formatear_contexto(self, pg_rows: list, qd_hits: list) -> str:
@@ -393,6 +393,11 @@ class Pipeline:
                 return body
             content = last_user.get("content")
             if not isinstance(content, str) or not content.strip():
+                return body
+
+            # ignorar requests internos de OpenWebUI (generación de tags, títulos, follow-ups)
+            PREFIJOS_INTERNOS = ("### Task:", "### Guidelines:", "Generate a title", "Generate 1-3")
+            if any(content.lstrip().startswith(p) for p in PREFIJOS_INTERNOS):
                 return body
 
             plan = self._clasificar(content)
