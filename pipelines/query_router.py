@@ -1,4 +1,4 @@
-"""
+si"""
 title: Query Router (PostgreSQL + Qdrant)
 author: colegio-tecnicos
 description: Intercepta la pregunta del usuario, clasifica con Claude si requiere datos
@@ -13,6 +13,7 @@ license: MIT
 
 import json
 import os
+import re
 from typing import List, Optional
 
 import psycopg2
@@ -423,5 +424,59 @@ class Pipeline:
             print(f"[query_router] ERROR: {e}")
         return body
 
+    def _fuentes(self, numeros: list[int]) -> str:
+        if not numeros:
+            return ""
+        conn = psycopg2.connect(self.pg_dsn)
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT acta_numero, tipo, fecha, pdf_url
+                    FROM actas
+                    WHERE acta_numero = ANY(%s) AND pdf_url IS NOT NULL
+                    ORDER BY acta_numero
+                    """,
+                    (numeros,),
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+
+        if not rows:
+            return ""
+        lineas = ["\n\n---\n### 📎 Fuentes"]
+        for r in rows:
+            tipo_abrev = "ME" if "Ejecutiva" in (r["tipo"] or "") else "CS"
+            fecha = str(r["fecha"]) if r["fecha"] else ""
+            lineas.append(
+                f"- [Acta {tipo_abrev} N° {r['acta_numero']} ({fecha})]({r['pdf_url']})"
+            )
+        return "\n".join(lineas)
+
     async def outlet(self, body: dict, user: Optional[dict] = None) -> dict:
+        if not self.valves.enabled:
+            return body
+        try:
+            msgs = body.get("messages", [])
+            last_assistant = next((m for m in reversed(msgs) if m.get("role") == "assistant"), None)
+            if not last_assistant:
+                return body
+            content = last_assistant.get("content")
+            if not isinstance(content, str):
+                return body
+
+            numeros = sorted({
+                int(n)
+                for n in re.findall(r"[Aa]cta[s]?\s+(?:[Nn][°o]?\s*)?(\d{3,4})", content)
+            })
+            if not numeros:
+                return body
+
+            fuentes = self._fuentes(numeros)
+            if fuentes:
+                last_assistant["content"] = content + fuentes
+                print(f"[query_router] fuentes agregadas — actas={numeros}")
+        except Exception as e:
+            print(f"[query_router] outlet ERROR: {e}")
         return body
