@@ -1,4 +1,4 @@
-si"""
+"""
 title: Query Router (PostgreSQL + Qdrant)
 author: colegio-tecnicos
 description: Intercepta la pregunta del usuario, clasifica con Claude si requiere datos
