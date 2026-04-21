@@ -63,6 +63,8 @@ spec:
               key: api-key
         - name: BEDROCK_MODEL
           value: "global.anthropic.claude-sonnet-4-6"
+        - name: CLASSIFIER_MODEL
+          value: "global.anthropic.claude-haiku-4-5-20251001-v1:0"
         - name: QDRANT_URL
           value: "http://qdrant-service.rag-system.svc.cluster.local:6333"
         - name: QDRANT_COLLECTION

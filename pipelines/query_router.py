@@ -107,6 +107,7 @@ class Pipeline:
         self.collection: str = "actas_colegio"
         self.llm: Optional[OpenAI] = None
         self.model: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+        self.classifier_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
         self.embedding_model: str = "amazon.titan-embed-text-v2:0"
         self._pending_actas: List[int] = []
 
@@ -121,7 +122,10 @@ class Pipeline:
         self.model = os.getenv(
             "BEDROCK_MODEL", "us.anthropic.claude-sonnet-4-20250514-v1:0"
         )
-        print(f"[query_router] startup OK — collection={self.collection} model={self.model}")
+        self.classifier_model = os.getenv(
+            "CLASSIFIER_MODEL", "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+        )
+        print(f"[query_router] startup OK — collection={self.collection} model={self.model} classifier={self.classifier_model}")
 
     async def on_shutdown(self):
         pass
@@ -130,7 +134,7 @@ class Pipeline:
         prompt = PROMPT_CLASIFICADOR.replace("__PREGUNTA__", pregunta)
         for intento in range(2):
             response = self.llm.chat.completions.create(
-                model=self.model,
+                model=self.classifier_model,
                 max_tokens=self.valves.classifier_max_tokens,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -453,13 +457,14 @@ class Pipeline:
 
         if not rows:
             return ""
-        lineas = ["\n\n---\n### 📎 Fuentes"]
+        lineas = ["\n\n---\n<small>📎 **Fuentes**"]
         for r in rows:
             tipo_abrev = "ME" if "Ejecutiva" in (r["tipo"] or "") else "CS"
             fecha = str(r["fecha"]) if r["fecha"] else ""
             lineas.append(
-                f"- [Acta {tipo_abrev} N° {r['acta_numero']} ({fecha})]({r['pdf_url']})"
+                f"· [Acta {tipo_abrev} N° {r['acta_numero']} ({fecha})]({r['pdf_url']})"
             )
+        lineas.append("</small>")
         return "\n".join(lineas)
 
     async def outlet(self, body: dict, user: Optional[dict] = None) -> dict:
