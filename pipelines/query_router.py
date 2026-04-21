@@ -40,6 +40,7 @@ Schema de salida (todos los campos obligatorios; usá null cuando no aplique):
   "usar_qdrant": bool,
   "filtros": {
     "matricula": "string|null",
+    "nombre": "string|null",
     "numero_acta": "int|null",
     "distrito": "string|null",
     "seccion": "string|null",
@@ -49,6 +50,8 @@ Schema de salida (todos los campos obligatorios; usá null cuando no aplique):
   },
   "query_semantica": "string|null"
 }
+
+Usá "nombre" cuando el usuario mencione una persona por nombre/apellido sin dar matrícula.
 
 Pregunta: \"\"\"__PREGUNTA__\"\"\"
 """
@@ -146,6 +149,7 @@ class Pipeline:
 
     def _sql(self, filtros: dict) -> list:
         matricula = filtros.get("matricula")
+        nombre = filtros.get("nombre")
         numero_acta = filtros.get("numero_acta")
         distrito = filtros.get("distrito")
         seccion = filtros.get("seccion")
@@ -156,6 +160,23 @@ class Pipeline:
         conn = psycopg2.connect(self.pg_dsn)
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                if nombre and not matricula:
+                    cur.execute(
+                        """
+                        SELECT a.acta_numero, a.tipo, a.fecha, n.seccion, n.codigo_nota,
+                               n.tema, n.descripcion, n.resolucion,
+                               p.nombre_completo, p.numero_matricula, p.rol_mencion
+                        FROM personas_mencionadas p
+                        JOIN notas_ingresadas n ON n.id = p.nota_id
+                        JOIN actas a ON a.id = n.acta_id
+                        WHERE p.nombre_completo ILIKE %s
+                        ORDER BY a.fecha DESC NULLS LAST
+                        LIMIT %s
+                        """,
+                        (f"%{nombre}%", self.valves.max_rows_pg),
+                    )
+                    return [dict(r) for r in cur.fetchall()]
+
                 if matricula:
                     cur.execute(
                         """
