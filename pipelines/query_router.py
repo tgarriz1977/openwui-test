@@ -424,7 +424,7 @@ class Pipeline:
             print(f"[query_router] ERROR: {e}")
         return body
 
-    def _fuentes(self, numeros: list[int]) -> str:
+    def _fuentes(self, numeros: List[int]) -> str:
         if not numeros:
             return ""
         conn = psycopg2.connect(self.pg_dsn)
